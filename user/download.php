@@ -1,130 +1,210 @@
 <?php
-// user/download.php
 require_once '../config/db.php';
 require_once '../includes/auth.php';
 requireLogin();
 
-// ==========================================
-// SERVER-SIDE PROXY DOWNLOAD LOGIC
-// ==========================================
-if (isset($_GET['url'])) {
-    $downloadUrl = $_GET['url'];
-    
-    // Obunani yoki qolgan videolar sonini tekshirish (Xavfsizlik uchun qayta tekshiruv)
-    $stmt = $pdo->prepare("SELECT subscription_expires_at, downloads_left FROM users WHERE id = ?");
-    $stmt->execute([$_SESSION['user_id']]);
-    $userStatus = $stmt->fetch();
-    $isSubscribed = ($userStatus['subscription_expires_at'] && strtotime($userStatus['subscription_expires_at']) > time());
-    $hasDownloads = ($userStatus['downloads_left'] > 0);
-
-    if (!$isSubscribed && !$hasDownloads) {
-        die("Xatolik: Yuklab olish ruxsati yo'q.");
-    }
-
-    // Video oqimini (stream) boshlash
-    header('Content-Description: File Transfer');
-    header('Content-Type: application/octet-stream');
-    header('Content-Disposition: attachment; filename="video_' . time() . '.mp4"');
-    header('Expires: 0');
-    header('Cache-Control: must-revalidate');
-    header('Pragma: public');
-
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $downloadUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, false); // Ma'lumotni to'g'ridan-to'g'ri uzatish
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 0); // Vaqt cheklovini olib tashlash (katta videolar uchun)
-    curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
-    
-    // YouTube DASH cheklovlarini chetlab o'tish uchun headerlar
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer: https://www.youtube.com/'
-    ]);
-
-    // Oqimni boshlash
-    curl_exec($ch);
-    $curl_error = curl_error($ch);
-    curl_close($ch);
-
-    if ($curl_error) {
-        // Xatolik bo'lsa logga yozish
-        file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] Proxy Error: $curl_error" . PHP_EOL, FILE_APPEND);
-    }
-    exit();
-}
-
-// Obunani yoki qolgan videolar sonini tekshirish
-$stmt = $pdo->prepare("SELECT subscription_expires_at, downloads_left FROM users WHERE id = ?");
+// User limit check
+$stmt = $pdo->prepare("SELECT subscription_expires_at, downloads_left FROM users WHERE id=?");
 $stmt->execute([$_SESSION['user_id']]);
-$userStatus = $stmt->fetch();
+$user = $stmt->fetch();
 
-$isSubscribed = ($userStatus['subscription_expires_at'] && strtotime($userStatus['subscription_expires_at']) > time());
-$hasDownloads = ($userStatus['downloads_left'] > 0);
+$isSubscribed = ($user['subscription_expires_at'] &&
+    strtotime($user['subscription_expires_at']) > time());
 
-if (!$isSubscribed && !$hasDownloads) {
-    header("Location: dashboard.php");
-    exit();
-}
+$hasDownloads = ($user['downloads_left'] > 0);
 
-// RapidAPI orqali video ma'lumotlarini olish (Faqat info qismi qoldi)
-$videoInfo = null;
 $error = '';
+$videoUrl = '';
+$videoInfo = null;
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['url'])) {
-    $url = $_POST['url'];
+// POST request - video URL qabul qilish
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $videoUrl = $_POST['url'] ?? '';
     
-    // Sozlamalardan API keyni olish
-    $stmt = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'rapidapi_key'");
-    $apiKey = trim($stmt->fetchColumn());
-
-    $curl = curl_init();
-    curl_setopt_array($curl, [
-        CURLOPT_URL => "https://yt-video-audio-downloader-api.p.rapidapi.com/video_info",
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_CUSTOMREQUEST => "POST",
-        CURLOPT_POSTFIELDS => json_encode(["url" => $url]),
-        CURLOPT_HTTPHEADER => [
-            "Content-Type: application/json",
-            "X-RapidAPI-Key: " . $apiKey,
-            "X-RapidAPI-Host: yt-video-audio-downloader-api.p.rapidapi.com"
-        ],
-        CURLOPT_TIMEOUT => 30
-    ]);
-
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-    curl_close($curl);
-
-    if ($err) {
-        $error = "API Error: " . $err;
+    if (!$videoUrl) {
+        $error = "Video URL kiritilmadi!";
+    } elseif (!filter_var($videoUrl, FILTER_VALIDATE_URL)) {
+        $error = "Noto'g'ri URL formati!";
+    } elseif (strpos($videoUrl, 'youtube.com') === false && strpos($videoUrl, 'youtu.be') === false) {
+        $error = "Faqat YouTube videolarni yuklab olish mumkin!";
     } else {
-        $videoInfo = json_decode($response, true);
+        // VPS API dan video ma'lumotlarini olish
+        // Avval yt_info.php ni sinab ko'ramiz, keyin yt_api.php ga info parametri bilan
+        $infoApi1 = "https://xpos.aidocs.uz/yt_info.php?url=" . urlencode($videoUrl);
+        $infoApi2 = "https://xpos.aidocs.uz/yt_api.php?info=1&url=" . urlencode($videoUrl);
         
-        if (isset($videoInfo['message']) && strpos($videoInfo['message'], 'not subscribed') !== false) {
-            $error = "RapidAPI xatosi: Obuna yo'q.";
-            $videoInfo = null;
-        } elseif (isset($videoInfo['status']) && ($videoInfo['status'] === 'fail' || $videoInfo['status'] === 'error')) {
-            $error = "Video ma'lumotlarini olib bo'lmadi.";
-            $videoInfo = null;
-        } elseif (isset($videoInfo['title'])) {
-            // Download tarixiga qo'shish
-            $stmt = $pdo->prepare("INSERT INTO downloads (user_id, video_link, video_title) VALUES (?, ?, ?)");
-            $title = $videoInfo['title'] ?? 'YouTube Video';
-            $stmt->execute([$_SESSION['user_id'], $url, $title]);
-
-            // Agar oylik obuna bo'lmasa, downloads_left ni kamaytirish
-            if (!$isSubscribed && $hasDownloads) {
-                $stmt = $pdo->prepare("UPDATE users SET downloads_left = downloads_left - 1 WHERE id = ?");
-                $stmt->execute([$_SESSION['user_id']]);
+        // Debug log
+        $debugLog = "[" . date('Y-m-d H:i:s') . "] INFO REQUEST\n";
+        $debugLog .= "Trying: " . $infoApi1 . "\n";
+        
+        $response = null;
+        $httpCode = 0;
+        $curlError = '';
+        $curlErrno = 0;
+        $apiUsed = '';
+        
+        // Birinchi variant: yt_info.php
+        $ch = curl_init($infoApi1);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_FOLLOWLOCATION => true,
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        $curlErrno = curl_errno($ch);
+        curl_close($ch);
+        
+        $apiUsed = $infoApi1;
+        
+        // Debug log yozish
+        $debugLog .= "API 1 (yt_info.php) - HTTP Code: " . $httpCode . "\n";
+        $debugLog .= "CURL Error: " . ($curlError ?: 'None') . "\n";
+        $debugLog .= "CURL Errno: " . ($curlErrno ?: '0') . "\n";
+        
+        // Agar 404 bo'lsa, ikkinchi variantni sinab ko'ramiz
+        if ($httpCode == 404) {
+            $debugLog .= "\nTrying alternative: " . $infoApi2 . "\n";
+            
+            $ch = curl_init($infoApi2);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_FOLLOWLOCATION => true,
+            ]);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            $curlErrno = curl_errno($ch);
+            curl_close($ch);
+            
+            $apiUsed = $infoApi2;
+            $debugLog .= "API 2 (yt_api.php?info=1) - HTTP Code: " . $httpCode . "\n";
+        }
+        
+        $debugLog .= "Response Length: " . strlen($response) . " bytes\n";
+        
+        if ($response) {
+            $debugLog .= "Response Preview: " . substr($response, 0, 500) . "\n";
+        }
+        
+        if ($httpCode == 200 && $response) {
+            $videoInfo = json_decode($response, true);
+            $jsonError = json_last_error();
+            
+            $debugLog .= "JSON Decode Error: " . ($jsonError ? json_last_error_msg() : 'None') . "\n";
+            
+            if ($jsonError === JSON_ERROR_NONE && $videoInfo) {
+                if (isset($videoInfo['error'])) {
+                    $error = $videoInfo['error'] ?? "Video ma'lumotlari olinmadi";
+                    $debugLog .= "API Error: " . $error . "\n";
+                } else {
+                    $debugLog .= "SUCCESS: Video info received from " . $apiUsed . "\n";
+                    $debugLog .= "Video Title: " . ($videoInfo['title'] ?? 'N/A') . "\n";
+                    $debugLog .= "Formats Count: " . (isset($videoInfo['formats']) ? count($videoInfo['formats']) : 0) . "\n";
+                }
+            } else {
+                $error = "Video ma'lumotlari JSON formatida emas";
+                $debugLog .= "ERROR: Invalid JSON response\n";
             }
         } else {
-            $error = "API dan kutilmagan javob keldi.";
-            $videoInfo = null;
+            if ($httpCode == 0 || $curlErrno) {
+                $error = "VPS API ga ulanib bo'lmadi. Server ishlamayapti yoki internet aloqasi yo'q.";
+            } elseif ($httpCode == 404) {
+                $error = "VPS API endpoint topilmadi. Iltimos, VPS serverda quyidagi fayllardan birini yarating:\n";
+                $error .= "1. yt_info.php (https://xpos.aidocs.uz/yt_info.php)\n";
+                $error .= "2. Yoki yt_api.php ga ?info=1 parametri qo'shish";
+            } elseif ($httpCode >= 500) {
+                $error = "VPS serverda xatolik yuz berdi (HTTP $httpCode)";
+            } else {
+                $error = "Video ma'lumotlarini olishda xatolik yuz berdi (HTTP $httpCode)";
+            }
+            $debugLog .= "ERROR: " . $error . "\n";
+            $debugLog .= "Used API: " . $apiUsed . "\n";
         }
+        
+        // Debug log faylga yozish
+        file_put_contents('../api_debug.log', $debugLog . "\n", FILE_APPEND);
     }
+}
+
+// GET request - video yuklab olish
+if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
+    $videoUrl = $_GET['url'] ?? '';
+    
+    if (!$videoUrl) {
+        die("Video URL kerak");
+    }
+    
+    // Limit tekshirish va kamaytirish
+    if (!$isSubscribed && !$hasDownloads) {
+        die("Yuklab olish limiti tugagan.");
+    }
+    
+    // Limit kamaytirish
+    if (!$isSubscribed && $hasDownloads) {
+        $pdo->prepare("
+            UPDATE users
+            SET downloads_left = downloads_left - 1
+            WHERE id=? AND downloads_left>0
+        ")->execute([$_SESSION['user_id']]);
+    }
+    
+    // VPS API orqali video streaming
+    $api = "https://xpos.aidocs.uz/yt_api.php?url=" . urlencode($videoUrl);
+    
+    set_time_limit(0);
+    ignore_user_abort(true);
+    
+    header('Content-Type: video/mp4');
+    header('Content-Disposition: attachment; filename="video.mp4"');
+    header('Cache-Control: no-cache');
+    
+    $ch = curl_init($api);
+    
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => false,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_BUFFERSIZE => 8192,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 0,
+        CURLOPT_WRITEFUNCTION => function ($ch, $data) {
+            echo $data;
+            flush();
+            return strlen($data);
+        }
+    ]);
+    
+    curl_exec($ch);
+    
+    if (curl_errno($ch)) {
+        $err = curl_error($ch);
+        $errno = curl_errno($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        
+        $debugLog = "[" . date('Y-m-d H:i:s') . "] VPS STREAM ERROR\n";
+        $debugLog .= "URL: " . $api . "\n";
+        $debugLog .= "HTTP Code: " . $httpCode . "\n";
+        $debugLog .= "CURL Error: " . $err . "\n";
+        $debugLog .= "CURL Errno: " . $errno . "\n\n";
+        
+        file_put_contents('../api_debug.log', $debugLog, FILE_APPEND);
+    } else {
+        // Muvaffaqiyatli streaming
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $debugLog = "[" . date('Y-m-d H:i:s') . "] VPS STREAM SUCCESS\n";
+        $debugLog .= "URL: " . $api . "\n";
+        $debugLog .= "HTTP Code: " . $httpCode . "\n\n";
+        file_put_contents('../api_debug.log', $debugLog, FILE_APPEND);
+    }
+    
+    curl_close($ch);
+    exit();
 }
 ?>
 <!DOCTYPE html>
@@ -139,18 +219,46 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['url'])) {
         .navbar { background: var(--secondary-color) !important; border-bottom: 1px solid var(--glass); }
         .nav-link { color: white !important; }
         .nav-link:hover { color: var(--primary-color) !important; }
-        .download-item {
-            background: #2a2a2a; padding: 12px 18px; border-radius: 10px;
-            display: flex; justify-content: space-between; align-items: center;
-            border: 1px solid var(--glass); transition: 0.3s; margin-bottom: 10px;
+        .download-card {
+            background: #2a2a2a; padding: 30px; border-radius: 15px;
+            border: 1px solid var(--glass); margin-top: 20px;
         }
-        .download-item:hover { border-color: var(--primary-color); background: #333; }
+        .download-btn {
+            padding: 15px 40px; font-size: 18px; font-weight: bold;
+            border-radius: 10px; transition: 0.3s;
+        }
+        .download-btn:hover {
+            transform: scale(1.05);
+        }
+        .thumbnail-box img {
+            max-width: 100%;
+            border-radius: 10px;
+            border: 1px solid var(--glass);
+        }
+        .download-item {
+            background: #2a2a2a;
+            padding: 12px 18px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--glass);
+            transition: 0.3s;
+            margin-bottom: 10px;
+        }
+        .download-item:hover {
+            border-color: var(--primary-color);
+            background: #333;
+        }
     </style>
 </head>
 <body class="bg-dark text-white">
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
         <div class="container">
             <a class="navbar-brand fw-bold text-danger fs-3" href="dashboard.php">YT Downloader</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#userNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
             <div class="collapse navbar-collapse" id="userNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item"><a class="nav-link px-3" href="dashboard.php">Asosiy</a></li>
@@ -162,71 +270,175 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['url'])) {
     </nav>
 
     <div class="container mt-4">
-        <div class="card">
-            <h2>Video Natijasi</h2>
-            
-            <?php if ($error): ?>
-                <div class="alert alert-danger"><?php echo $error; ?></div>
-                <a href="dashboard.php" class="btn btn-secondary">Orqaga</a>
-            <?php elseif ($videoInfo): ?>
-                <div>
-                    <h3 class="mb-3"><?php echo htmlspecialchars($videoInfo['title']); ?></h3>
-                    <?php if (isset($videoInfo['thumbnail'])): ?>
-                        <img src="<?php echo $videoInfo['thumbnail']; ?>" class="img-fluid rounded mb-4" style="max-width: 480px;">
+        <?php if ($error): ?>
+            <div class="card">
+                <div class="alert alert-danger px-4 py-3">
+                    <h4>Xatolik!</h4>
+                    <p><?php echo htmlspecialchars($error); ?></p>
+                    <?php if (file_exists('../api_debug.log')): ?>
+                        <details class="mt-3">
+                            <summary class="text-white-50" style="cursor: pointer;">Debug ma'lumotlari</summary>
+                            <pre class="mt-2 p-2 bg-dark text-white-50 small" style="max-height: 200px; overflow-y: auto; border-radius: 5px;"><?php 
+                                $logContent = file_get_contents('../api_debug.log');
+                                echo htmlspecialchars(substr($logContent, -2000)); // Oxirgi 2000 belgi
+                            ?></pre>
+                        </details>
                     <?php endif; ?>
-                    
-                    <h4 class="mb-3">Yuklab olish formatlari:</h4>
-                    <div class="format-list">
+                </div>
+                <div class="text-center mt-3">
+                    <a href="dashboard.php" class="btn btn-secondary px-5">Orqaga</a>
+                </div>
+            </div>
+        <?php elseif ($videoUrl && $videoInfo): ?>
+            <div class="card p-4">
+                <h2 class="mb-4 text-center">Video Natijasi</h2>
+                
+                <div class="row align-items-start">
+                    <div class="col-md-5 mb-4 thumbnail-box">
                         <?php 
-                        $medias = $videoInfo['formats'] ?? $videoInfo['medias'] ?? [];
-                        if (!empty($medias)):
-                            foreach ($medias as $index => $media):
-                                $qualityLabel = $media['formatNote'] ?? $media['quality'] ?? 'HD';
-                                $extText = $media['extension'] ?? $media['type'] ?? 'MP4';
-                                $googlevideoUrl = $media['url'] ?? '';
-
-                                // Server-Side Proxy Link
-                                $proxyDownloadLink = "download.php?url=" . urlencode($googlevideoUrl);
+                        $thumb = $videoInfo['thumbnail'] ?? '';
+                        if (isset($videoInfo['thumbnails']) && is_array($videoInfo['thumbnails']) && !empty($videoInfo['thumbnails'])) {
+                            $thumb = end($videoInfo['thumbnails'])['url'] ?? $thumb;
+                        }
+                        if ($thumb):
+                        ?>
+                            <img src="<?php echo htmlspecialchars($thumb); ?>" class="img-fluid shadow-lg" alt="Video thumbnail">
+                        <?php endif; ?>
+                    </div>
+                    <div class="col-md-7">
+                        <h4 class="mb-4 text-primary"><?php echo htmlspecialchars($videoInfo['title'] ?? 'Noma\'lum video'); ?></h4>
+                        
+                        <?php if (isset($videoInfo['description'])): ?>
+                            <p class="text-white-50 mb-4 small"><?php echo htmlspecialchars(substr($videoInfo['description'], 0, 200)) . (strlen($videoInfo['description']) > 200 ? '...' : ''); ?></p>
+                        <?php endif; ?>
+                        
+                        <div class="format-list">
+                            <?php 
+                            $formats = $videoInfo['formats'] ?? [];
+                            $shownFormats = [];
+                            
+                            // Formatlarni saralash - eng yaxshi sifatlarni birinchi ko'rsatish
+                            usort($formats, function($a, $b) {
+                                $heightA = $a['height'] ?? 0;
+                                $heightB = $b['height'] ?? 0;
+                                return $heightB - $heightA;
+                            });
+                            
+                            foreach ($formats as $f): 
+                                // Faqat video+audio yoki audio formatlarni ko'rsatish
+                                $hasVideo = isset($f['vcodec']) && $f['vcodec'] !== 'none';
+                                $hasAudio = isset($f['acodec']) && $f['acodec'] !== 'none';
+                                
+                                if (!$hasVideo && !$hasAudio) continue;
+                                
+                                $formatId = $f['format_id'] ?? '';
+                                $quality = '';
+                                
+                                if ($hasVideo) {
+                                    $height = $f['height'] ?? 0;
+                                    $quality = $height . 'p';
+                                } else {
+                                    $quality = 'Audio';
+                                }
+                                
+                                // Dublikatlarni oldini olish
+                                $formatKey = $quality . '_' . ($f['ext'] ?? 'mp4');
+                                if (in_array($formatKey, $shownFormats)) continue;
+                                $shownFormats[] = $formatKey;
+                                
+                                $ext = $f['ext'] ?? 'mp4';
+                                $size = $f['filesize'] ?? $f['filesize_approx'] ?? 0;
+                                
+                                $downloadLink = "download.php?url=" . urlencode($videoUrl);
                             ?>
-                            <div class="download-item">
-                                <div class="item-info">
-                                    <span class="badge bg-danger me-2"><?php echo strtoupper(htmlspecialchars($extText)); ?></span>
-                                    <span class="fw-bold"><?php echo htmlspecialchars($qualityLabel); ?></span>
-                                    <?php if(isset($media['filesize'])): ?>
-                                        <small class="text-muted ms-2">(<?php echo round($media['filesize'] / 1024 / 1024, 2); ?> MB)</small>
-                                    <?php endif; ?>
+                                <div class="download-item">
+                                    <div class="item-info">
+                                        <span class="badge bg-danger me-2"><?php echo strtoupper(htmlspecialchars($ext)); ?></span>
+                                        <span class="fw-bold fs-6"><?php echo htmlspecialchars($quality); ?></span>
+                                        <?php if($size > 0): ?>
+                                            <small class="text-white-50 ms-2">(<?php echo round($size / 1024 / 1024, 2); ?> MB)</small>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="action-btn">
+                                        <a href="<?php echo $downloadLink; ?>" 
+                                           class="btn btn-primary btn-sm px-4" 
+                                           onclick="showLoading()">
+                                            Yuklab olish
+                                        </a>
+                                    </div>
                                 </div>
-                                <div class="action-btn">
-                                    <a href="<?php echo $proxyDownloadLink; ?>" class="btn btn-primary btn-sm" onclick="showLoading()">Yuklab olish</a>
-                                </div>
-                            </div>
-                        <?php endforeach; else: ?>
-                            <p class="text-warning">Yuklab olish linklari topilmadi.</p>
+                            <?php 
+                            endforeach; 
+                            ?>
+                        </div>
+                        
+                        <?php if (empty($shownFormats)): ?>
+                            <p class="text-warning">Yuklab olish formatlari topilmadi.</p>
+                            <a href="download.php?url=<?php echo urlencode($videoUrl); ?>" 
+                               class="btn btn-danger" 
+                               onclick="showLoading()">
+                                <i class="fa-solid fa-download me-2"></i>Video yuklab olish
+                            </a>
                         <?php endif; ?>
                     </div>
                 </div>
-            <?php endif; ?>
-        </div>
+            </div>
+        <?php elseif ($videoUrl): ?>
+            <div class="card download-card text-center">
+                <h2 class="mb-4">Video tayyor</h2>
+                <p class="mb-4 text-white-50">Quyidagi tugmani bosib videoni yuklab oling</p>
+                
+                <div class="mb-4">
+                    <p class="text-white-50 small">
+                        <strong>Video URL:</strong><br>
+                        <span class="text-white"><?php echo htmlspecialchars($videoUrl); ?></span>
+                    </p>
+                </div>
+                
+                <a href="download.php?url=<?php echo urlencode($videoUrl); ?>" 
+                   class="btn btn-danger download-btn" 
+                   onclick="showLoading()">
+                    <i class="fa-solid fa-download me-2"></i>Video yuklab olish
+                </a>
+                
+                <div class="mt-4">
+                    <p class="text-white-50 small">
+                        <i class="fa-solid fa-info-circle me-2"></i>
+                        Video serverda tayyorlanmoqda. Bu bir necha daqiqa vaqt olishi mumkin.
+                    </p>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="card">
+                <h2>Video yuklash</h2>
+                <form method="POST" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label>YouTube Video Linki</label>
+                        <input type="url" name="url" placeholder="https://www.youtube.com/watch?v=..." required>
+                    </div>
+                    <button type="submit" class="btn">Yuklab olish</button>
+                </form>
+            </div>
+        <?php endif; ?>
     </div>
 
     <!-- Loading Overlay -->
     <div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; text-align: center; padding: 20px;">
         <div class="spinner-border text-danger mb-3" role="status" style="width: 3.5rem; height: 3.5rem;"></div>
-        <h4 class="mb-2">Server bilan bog'lanilmoqda...</h4>
-        <p class="text-white-50">Video oqimi server orqali tunnel qilinmoqda. <br> Yuklab olish brauzeringizda avtomatik boshlanadi.</p>
+        <h4 class="mb-2">Video tayyorlanmoqda...</h4>
+        <p class="text-white-50">Video serverda yuklab olinmoqda. <br> Bu bir necha daqiqa vaqt olishi mumkin.</p>
         <button class="btn btn-sm btn-outline-light mt-3" onclick="hideLoading()">Yopish</button>
     </div>
 
     <script>
         function showLoading() {
             document.getElementById('loadingOverlay').style.display = 'flex';
-            // Brauzer yuklashni boshlaguncha modalni ko'rsatamiz
-            setTimeout(hideLoading, 5000); 
         }
         function hideLoading() {
             document.getElementById('loadingOverlay').style.display = 'none';
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </body>
 </html>

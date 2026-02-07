@@ -48,8 +48,7 @@ INSERT INTO settings (setting_key, setting_value) VALUES
 ('monthly_price', '50000'),
 ('per_video_price', '5000'),
 ('card_number', '0000 0000 0000 0000'),
-('card_holder', 'NAME SURNAME'),
-('rapidapi_key', '7f149b0197msh5473eae0770553p1c70c4jsnd254e2710c7d');
+('card_holder', 'NAME SURNAME');
 
 -- Default Admin (password: admin123)
 -- Hash: $2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi (standard password hash for 'password', but let's use a real one)

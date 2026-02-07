@@ -1,0 +1,30 @@
+<?php
+// VPS serverda yaratilishi kerak: yt_info.php
+// Manzil: https://xpos.aidocs.uz/yt_info.php
+
+header('Content-Type: application/json');
+
+$url = $_GET['url'] ?? '';
+
+if (!$url) {
+    echo json_encode(['error' => 'URL kerak']);
+    exit;
+}
+
+// yt-dlp dan JSON formatida video ma'lumotlarini olish
+$cmd = "yt-dlp -J " . escapeshellarg($url) . " 2>&1";
+$output = shell_exec($cmd);
+
+if ($output) {
+    // JSON ni tozalash va qaytarish
+    $json = json_decode($output, true);
+    if ($json) {
+        echo json_encode($json);
+    } else {
+        echo json_encode(['error' => 'Video ma\'lumotlari olinmadi', 'raw' => $output]);
+    }
+} else {
+    echo json_encode(['error' => 'yt-dlp ishlamadi']);
+}
+?>
+

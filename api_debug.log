@@ -1,32 +1,9 @@
-[2026-02-07 18:55:11] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 18:55:37] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 18:55:45] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 18:55:47] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 18:55:48] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 18:55:53] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 19:00:19] EXEC: "C:\xampp\htdocs\ytdownloader\yt-dlp.exe" --ffmpeg-location "C:\xampp\htdocs\ytdownloader\" -f "397+140/bestaudio" --merge-output-format mp4 -o "C:\xampp\htdocs\ytdownloader\uploads\temp_downloads\yt_1770487219_509.mp4" "https://www.youtube.com/watch?v=KHFx30BuoQU&list=RDXww1EeTdt7I&index=9"
-[2026-02-07 19:00:19] yt-dlp ERROR (1): ""C:\xampp\htdocs\ytdownloader\yt-dlp.exe"" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 19:04:33] ERROR:
-Системе не удается найти указанный путь.
+[2026-02-07 20:27:42] INFO REQUEST
+Trying: https://xpos.aidocs.uz/yt_info.php?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DXww1EeTdt7I%26list%3DRDvMU2sLnlPZo%26index%3D9
+API 1 (yt_info.php) - HTTP Code: 0
+CURL Error: Operation timed out after 30007 milliseconds with 0 bytes received
+CURL Errno: 28
+Response Length: 0 bytes
+ERROR: VPS API ga ulanib bo'lmadi. Server ishlamayapti yoki internet aloqasi yo'q.
+Used API: https://xpos.aidocs.uz/yt_info.php?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DXww1EeTdt7I%26list%3DRDvMU2sLnlPZo%26index%3D9
 
-[2026-02-07 19:06:46] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 19:06:56] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 19:07:08] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 19:07:13] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 19:07:20] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 19:07:24] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.
-[2026-02-07 19:07:31] yt-dlp error: "yt-dlp" не является внутренней или внешней
-командой, исполняемой программой или пакетным файлом.

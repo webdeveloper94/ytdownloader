@@ -78,10 +78,6 @@ $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
                     <label>Bitta video yuklash narxi (so'm)</label>
                     <input type="number" name="per_video_price" value="<?php echo htmlspecialchars($settings['per_video_price']); ?>" required>
                 </div>
-                <div class="form-group">
-                    <label>RapidAPI Kaliti</label>
-                    <input type="text" name="rapidapi_key" value="<?php echo htmlspecialchars($settings['rapidapi_key']); ?>" required>
-                </div>
                 <button type="submit" class="btn">Saqlash</button>
             </form>
         </div>
