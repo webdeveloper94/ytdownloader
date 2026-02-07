@@ -1,9 +1,51 @@
-[2026-02-07 20:27:42] INFO REQUEST
-Trying: https://xpos.aidocs.uz/yt_info.php?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DXww1EeTdt7I%26list%3DRDvMU2sLnlPZo%26index%3D9
-API 1 (yt_info.php) - HTTP Code: 0
-CURL Error: Operation timed out after 30007 milliseconds with 0 bytes received
-CURL Errno: 28
-Response Length: 0 bytes
-ERROR: VPS API ga ulanib bo'lmadi. Server ishlamayapti yoki internet aloqasi yo'q.
-Used API: https://xpos.aidocs.uz/yt_info.php?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DXww1EeTdt7I%26list%3DRDvMU2sLnlPZo%26index%3D9
+[2026-02-07 20:41:42] INFO REQUEST
+Trying: https://xpos.aidocs.uz/yt_info.php?info=1&url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FSFWE24T98Y4
+API 1 (yt_info.php) - HTTP Code: 200
+CURL Error: None
+CURL Errno: 0
+Response Length: 602342 bytes
+Response Preview: {"error":"Video ma'lumotlari olinmadi","raw":"WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command\/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https:\/\/github.com\/yt-dlp\/yt-dlp\/wiki\/EJS  for details on installing one\n{\"id\": \"SFWE24T98Y4\", \"title\": \"Are you starting to doubt your own eyes? \\ud83d\\ude
+JSON Decode Error: None
+API Error: Video ma'lumotlari olinmadi
+Raw Error: WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+{"id": "SFWE24T98Y4", "title": "Are you starting to doubt your own eyes? \ud83d\ude02\ud83d\ude02 #illusion #viral #funny #funnyvideos #satisfying
+
+[2026-02-07 20:43:47] INFO REQUEST
+Trying: https://xpos.aidocs.uz/yt_info.php?info=1&url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FSFWE24T98Y4
+API 1 (yt_info.php) - HTTP Code: 200
+CURL Error: None
+CURL Errno: 0
+Response Length: 602166 bytes
+Response Preview: {"error":"Video ma'lumotlari olinmadi","raw":"WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command\/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https:\/\/github.com\/yt-dlp\/yt-dlp\/wiki\/EJS  for details on installing one\n{\"id\": \"SFWE24T98Y4\", \"title\": \"Are you starting to doubt your own eyes? \\ud83d\\ude
+JSON Decode Error: None
+API Error: Video ma'lumotlari olinmadi
+Raw Error: WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+{"id": "SFWE24T98Y4", "title": "Are you starting to doubt your own eyes? \ud83d\ude02\ud83d\ude02 #illusion #viral #funny #funnyvideos #satisfying
+
+[2026-02-07 20:45:38] INFO REQUEST
+Trying: https://xpos.aidocs.uz/yt_info.php?info=1&url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FSFWE24T98Y4
+API 1 (yt_info.php) - HTTP Code: 200
+CURL Error: None
+CURL Errno: 0
+Response Length: 602218 bytes
+Response Preview: {"error":"Video ma'lumotlari olinmadi","raw":"WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command\/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing. See  https:\/\/github.com\/yt-dlp\/yt-dlp\/wiki\/EJS  for details on installing one\n{\"id\": \"SFWE24T98Y4\", \"title\": \"Are you starting to doubt your own eyes? \\ud83d\\ude
+JSON Decode Error: None
+SUCCESS: JSON extracted from raw output
+Video Title: Are you starting to doubt your own eyes? 😂😂 #illusion #viral #funny #funnyvideos #satisfying
+
+[2026-02-07 20:45:53] VPS STREAM SUCCESS
+URL: https://xpos.aidocs.uz/yt_api.php?url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FSFWE24T98Y4
+HTTP Code: 200
+
+[2026-02-07 20:46:06] VPS STREAM SUCCESS
+URL: https://xpos.aidocs.uz/yt_api.php?url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FSFWE24T98Y4
+HTTP Code: 200
+
+[2026-02-07 20:46:20] VPS STREAM SUCCESS
+URL: https://xpos.aidocs.uz/yt_api.php?url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FSFWE24T98Y4
+HTTP Code: 200
+
+[2026-02-07 20:46:29] VPS STREAM SUCCESS
+URL: https://xpos.aidocs.uz/yt_api.php?url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FSFWE24T98Y4
+HTTP Code: 200
 

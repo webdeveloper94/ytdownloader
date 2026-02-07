@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } else {
         // VPS API dan video ma'lumotlarini olish
         // Avval yt_info.php ni sinab ko'ramiz, keyin yt_api.php ga info parametri bilan
-        $infoApi1 = "https://xpos.aidocs.uz/yt_info.php?url=" . urlencode($videoUrl);
+        $infoApi1 = "https://xpos.aidocs.uz/yt_info.php?info=1&url=" . urlencode($videoUrl);
         $infoApi2 = "https://xpos.aidocs.uz/yt_api.php?info=1&url=" . urlencode($videoUrl);
         
         // Debug log
@@ -47,7 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $ch = curl_init($infoApi1);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT => 90,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_FOLLOWLOCATION => true,
         ]);
@@ -72,7 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $ch = curl_init($infoApi2);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_TIMEOUT => 90,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_FOLLOWLOCATION => true,
             ]);
@@ -101,8 +103,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             if ($jsonError === JSON_ERROR_NONE && $videoInfo) {
                 if (isset($videoInfo['error'])) {
-                    $error = $videoInfo['error'] ?? "Video ma'lumotlari olinmadi";
-                    $debugLog .= "API Error: " . $error . "\n";
+                    // VPS-dan xato qaytdi
+                    $vpsError = $videoInfo['error'] ?? "Video ma'lumotlari olinmadi";
+                    $rawError = $videoInfo['raw'] ?? '';
+                    
+                    // Raw outputdan JSON ni ajratib olishga harakat qilish
+                    if ($rawError) {
+                        $lines = explode("\n", $rawError);
+                        $extractedJson = null;
+                        
+                        foreach ($lines as $line) {
+                            $trimmed = trim($line);
+                            if ($trimmed && ($trimmed[0] === '{' || $trimmed[0] === '[')) {
+                                $extractedJson = json_decode($trimmed, true);
+                                if ($extractedJson && json_last_error() === JSON_ERROR_NONE) {
+                                    // JSON muvaffaqiyatli topildi!
+                                    $videoInfo = $extractedJson;
+                                    $error = ''; // Xatoni olib tashlash
+                                    $debugLog .= "SUCCESS: JSON extracted from raw output\n";
+                                    $debugLog .= "Video Title: " . ($videoInfo['title'] ?? 'N/A') . "\n";
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Agar JSON topilmagan bo'lsa, xatolikni ko'rsatish
+                    if ($error !== '') {
+                        // yt-dlp versiya xatosini aniqlash
+                        if (strpos($rawError, 'Precondition check failed') !== false || 
+                            strpos($rawError, 'HTTP Error 400') !== false) {
+                            $error = "VPS serverda yt-dlp versiyasi eskigan. ";
+                            $error .= "YouTube-ning yangi talablariga mos emas. ";
+                            $error .= "VPS serverda 'sudo pip3 install --upgrade yt-dlp' buyrug'ini bajaring.";
+                        } elseif (strpos($rawError, 'No supported JavaScript runtime') !== false) {
+                            $error = "VPS serverda JavaScript runtime (Node.js) o'rnatilmagan yoki to'g'ri sozlanmagan. ";
+                            $error .= "VPS serverda 'sudo apt install -y nodejs' buyrug'ini bajaring.";
+                        } else {
+                            $error = "VPS API xatosi: " . $vpsError;
+                        }
+                        
+                        $debugLog .= "API Error: " . $vpsError . "\n";
+                        if ($rawError) {
+                            $debugLog .= "Raw Error: " . substr($rawError, 0, 500) . "\n";
+                        }
+                    }
                 } else {
                     $debugLog .= "SUCCESS: Video info received from " . $apiUsed . "\n";
                     $debugLog .= "Video Title: " . ($videoInfo['title'] ?? 'N/A') . "\n";
@@ -113,8 +158,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $debugLog .= "ERROR: Invalid JSON response\n";
             }
         } else {
-            if ($httpCode == 0 || $curlErrno) {
-                $error = "VPS API ga ulanib bo'lmadi. Server ishlamayapti yoki internet aloqasi yo'q.";
+            if ($curlErrno == 28) {
+                $error = "VPS API so'rovni bajarishda vaqt tugadi (Timeout). Iltimos, qaytadan urinib ko'ring yoki URL manzilini tekshiring.";
+            } elseif ($httpCode == 0 || $curlErrno) {
+                $error = "VPS API ga ulanib bo'lmadi (CURL error: $curlError). Server ishlamayapti yoki internet aloqasi yo'q.";
             } elseif ($httpCode == 404) {
                 $error = "VPS API endpoint topilmadi. Iltimos, VPS serverda quyidagi fayllardan birini yarating:\n";
                 $error .= "1. yt_info.php (https://xpos.aidocs.uz/yt_info.php)\n";
@@ -124,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             } else {
                 $error = "Video ma'lumotlarini olishda xatolik yuz berdi (HTTP $httpCode)";
             }
-            $debugLog .= "ERROR: " . $error . "\n";
+            $debugLog .= "ERROR: " . $error . " (CURL Errno: $curlErrno)\n";
             $debugLog .= "Used API: " . $apiUsed . "\n";
         }
         
