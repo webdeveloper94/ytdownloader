@@ -1,6 +1,4 @@
 <?php
-// VPS serverda yaratilishi kerak: yt_info.php
-// Manzil: https://xpos.aidocs.uz/yt_info.php
 
 header('Content-Type: application/json');
 

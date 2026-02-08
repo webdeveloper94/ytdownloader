@@ -28,10 +28,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } elseif (strpos($videoUrl, 'youtube.com') === false && strpos($videoUrl, 'youtu.be') === false) {
         $error = "Faqat YouTube videolarni yuklab olish mumkin!";
     } else {
-        // VPS API dan video ma'lumotlarini olish
-        // Avval yt_info.php ni sinab ko'ramiz, keyin yt_api.php ga info parametri bilan
-        $infoApi1 = "https://xpos.aidocs.uz/yt_info.php?info=1&url=" . urlencode($videoUrl);
-        $infoApi2 = "https://xpos.aidocs.uz/yt_api.php?info=1&url=" . urlencode($videoUrl);
+        // API dan video ma'lumotlarini olish
+        // LOCAL MODE: Lokal serverda test qilish uchun localhost ishlatamiz
+        // PRODUCTION MODE: VPS serverni ishlatish uchun quyidagi qatorlarni o'zgartiring
+        $useLocal = true; // true = localhost (Windows XAMPP), false = VPS server
+        
+        if ($useLocal) {
+            // Lokal server (XAMPP) - yt-dlp Windows da o'rnatilgan
+            $baseUrl = "http://localhost/ytdownloader/";
+            $infoApi1 = $baseUrl . "yt_info.php?url=" . urlencode($videoUrl);
+            $infoApi2 = $baseUrl . "yt_api.php?info=1&url=" . urlencode($videoUrl);
+        } else {
+            // VPS server (95.111.250.26)
+            $infoApi1 = "http://95.111.250.26/yt_info.php?info=1&url=" . urlencode($videoUrl);
+            $infoApi2 = "http://95.111.250.26/yt_api.php?info=1&url=" . urlencode($videoUrl);
+        }
+
         
         // Debug log
         $debugLog = "[" . date('Y-m-d H:i:s') . "] INFO REQUEST\n";
@@ -164,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $error = "VPS API ga ulanib bo'lmadi (CURL error: $curlError). Server ishlamayapti yoki internet aloqasi yo'q.";
             } elseif ($httpCode == 404) {
                 $error = "VPS API endpoint topilmadi. Iltimos, VPS serverda quyidagi fayllardan birini yarating:\n";
-                $error .= "1. yt_info.php (https://xpos.aidocs.uz/yt_info.php)\n";
+                $error .= "1. yt_info.php (http://95.111.250.26/yt_info.php)\n";
                 $error .= "2. Yoki yt_api.php ga ?info=1 parametri qo'shish";
             } elseif ($httpCode >= 500) {
                 $error = "VPS serverda xatolik yuz berdi (HTTP $httpCode)";
@@ -202,8 +214,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         ")->execute([$_SESSION['user_id']]);
     }
     
-    // VPS API orqali video streaming
-    $api = "https://xpos.aidocs.uz/yt_api.php?url=" . urlencode($videoUrl);
+    // Video streaming API
+    $useLocal = true; // Yuqoridagi qiymat bilan bir xil
+    
+    if ($useLocal) {
+        $api = "http://localhost/ytdownloader/yt_api.php?url=" . urlencode($videoUrl);
+    } else {
+        $api = "http://95.111.250.26/yt_api.php?url=" . urlencode($videoUrl);
+    }
     
     set_time_limit(0);
     ignore_user_abort(true);
