@@ -1,12 +1,15 @@
 <?php
-// yt_api.php - Video ma'lumoti va yuklab olish (lokal test uchun)
+// VPS serverda root directory: /var/www/html/ yoki /var/www/html/ytdownloader/
+// Bu fayl: yt_api.php
 
 set_time_limit(600); // 10 daqiqa PHP timeout (video yuklab olish uchun)
 
 $url = $_GET['url'] ?? '';
 $info = isset($_GET['info']) && $_GET['info'] == '1';
 
-if (!$url) die("URL kerak");
+if (!$url) {
+    die(json_encode(['error' => 'URL kerak']));
+}
 
 if ($info) {
     // Video ma'lumotlarini JSON formatida qaytarish
@@ -47,7 +50,11 @@ if (file_exists($tmp) && filesize($tmp) > 0) {
     readfile($tmp);
     unlink($tmp);
 } else {
-    header('Content-Type: text/plain');
-    echo "Video yuklab olinmadi. Xato: " . implode("\n", $cmdOutput);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'error' => 'Video yuklab olinmadi',
+        'details' => implode("\n", $cmdOutput),
+        'return_code' => $returnCode
+    ]);
 }
 ?>

@@ -131,3 +131,21 @@ HTTP Code: 200
 URL: http://localhost/ytdownloader/yt_api.php?url=https%3A%2F%2Fwww.youtube.com%2Fshorts%2FPGpRrRJcQ9o
 HTTP Code: 200
 
+[2026-02-08 15:52:08] INFO REQUEST
+Trying: http://localhost/ytdownloader/yt_info.php?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DXww1EeTdt7I%26list%3DRDMMXww1EeTdt7I%26start_radio%3D1
+API 1 (yt_info.php) - HTTP Code: 0
+CURL Error: Operation timed out after 90000 milliseconds with 0 bytes received
+CURL Errno: 28
+Response Length: 0 bytes
+ERROR: VPS API so'rovni bajarishda vaqt tugadi (Timeout). Iltimos, qaytadan urinib ko'ring yoki URL manzilini tekshiring. (CURL Errno: 28)
+Used API: http://localhost/ytdownloader/yt_info.php?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DXww1EeTdt7I%26list%3DRDMMXww1EeTdt7I%26start_radio%3D1
+
+[2026-02-08 15:57:46] INFO REQUEST
+Trying: http://localhost/ytdownloader/yt_info.php?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DXww1EeTdt7I%26list%3DRDMMXww1EeTdt7I%26start_radio%3D1
+API 1 (yt_info.php) - HTTP Code: 0
+CURL Error: Operation timed out after 180006 milliseconds with 0 bytes received
+CURL Errno: 28
+Response Length: 0 bytes
+ERROR: VPS API so'rovni bajarishda vaqt tugadi (Timeout). Iltimos, qaytadan urinib ko'ring yoki URL manzilini tekshiring. (CURL Errno: 28)
+Used API: http://localhost/ytdownloader/yt_info.php?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DXww1EeTdt7I%26list%3DRDMMXww1EeTdt7I%26start_radio%3D1
+

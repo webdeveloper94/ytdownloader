@@ -39,8 +39,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $infoApi1 = $baseUrl . "yt_info.php?url=" . urlencode($videoUrl);
             $infoApi2 = $baseUrl . "yt_api.php?info=1&url=" . urlencode($videoUrl);
         } else {
-            // VPS server (95.111.250.26)
-            $infoApi1 = "http://95.111.250.26/yt_info.php?info=1&url=" . urlencode($videoUrl);
+            // VPS server (95.111.250.26) - PRODUCTION
+            // IMPORTANT: VPS da yt_info.php va yt_api.php root directory da bo'lishi kerak
+            // Agar subdirectory da bo'lsa, URL ni o'zgartiring, masalan:
+            // $baseUrl = "http://95.111.250.26/ytdownloader/";
+            $infoApi1 = "http://95.111.250.26/yt_info.php?url=" . urlencode($videoUrl);
             $infoApi2 = "http://95.111.250.26/yt_api.php?info=1&url=" . urlencode($videoUrl);
         }
 
@@ -56,11 +59,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $apiUsed = '';
         
         // Birinchi variant: yt_info.php
+        // Katta videolar uchun timeout oshirildi
+        set_time_limit(300); // PHP execution timeout: 5 daqiqa
+        
         $ch = curl_init($infoApi1);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => 15,
-            CURLOPT_TIMEOUT => 90,
+            CURLOPT_CONNECTTIMEOUT => 30,
+            CURLOPT_TIMEOUT => 180, // 3 daqiqa (katta videolar uchun)
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_FOLLOWLOCATION => true,
         ]);
@@ -85,8 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $ch = curl_init($infoApi2);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_CONNECTTIMEOUT => 15,
-                CURLOPT_TIMEOUT => 90,
+                CURLOPT_CONNECTTIMEOUT => 30,
+                CURLOPT_TIMEOUT => 180, // 3 daqiqa
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_FOLLOWLOCATION => true,
             ]);
