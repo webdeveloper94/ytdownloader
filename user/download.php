@@ -236,64 +236,86 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                         <div class="format-list">
                             <?php 
                             $formats = $videoInfo['formats'] ?? [];
-                            $shownFormats = [];
                             
-                            // Formatlarni saralash - eng yaxshi sifatlarni birinchi ko'rsatish
-                            usort($formats, function($a, $b) {
-                                $heightA = $a['height'] ?? 0;
-                                $heightB = $b['height'] ?? 0;
-                                return $heightB - $heightA;
-                            });
-                            
-                            foreach ($formats as $f): 
-                                // Faqat video+audio yoki audio formatlarni ko'rsatish
-                                $hasVideo = isset($f['vcodec']) && $f['vcodec'] !== 'none';
-                                $hasAudio = isset($f['acodec']) && $f['acodec'] !== 'none';
+                            if (empty($formats)) {
+                                echo '<p class="text-warning">Formatlar topilmadi.</p>';
+                            } else {
+                                // Sort by quality (higher first)
+                                usort($formats, function($a, $b) {
+                                    $qualityA = $a['quality'] ?? 0;
+                                    $qualityB = $b['quality'] ?? 0;
+                                    
+                                    // If quality is numeric, compare as numbers
+                                    if (is_numeric($qualityA) && is_numeric($qualityB)) {
+                                        return $qualityB - $qualityA;
+                                    }
+                                    
+                                    return 0;
+                                });
                                 
-                                if (!$hasVideo && !$hasAudio) continue;
-                                
-                                $formatId = $f['format_id'] ?? '';
-                                $quality = '';
-                                
-                                if ($hasVideo) {
-                                    $height = $f['height'] ?? 0;
-                                    $quality = $height . 'p';
-                                } else {
-                                    $quality = 'Audio';
-                                }
-                                
-                                // Dublikatlarni oldini olish
-                                $formatKey = $quality . '_' . ($f['ext'] ?? 'mp4');
-                                if (in_array($formatKey, $shownFormats)) continue;
-                                $shownFormats[] = $formatKey;
-                                
-                                $ext = $f['ext'] ?? 'mp4';
-                                $size = $f['filesize'] ?? $f['filesize_approx'] ?? 0;
-                                
-                                $downloadLink = "download.php?url=" . urlencode($videoUrl);
-                            ?>
-                                <div class="download-item">
-                                    <div class="item-info">
-                                        <span class="badge bg-danger me-2"><?php echo strtoupper(htmlspecialchars($ext)); ?></span>
-                                        <span class="fw-bold fs-6"><?php echo htmlspecialchars($quality); ?></span>
-                                        <?php if($size > 0): ?>
-                                            <small class="text-white-50 ms-2">(<?php echo round($size / 1024 / 1024, 2); ?> MB)</small>
-                                        <?php endif; ?>
+                                foreach ($formats as $f): 
+                                    // Robust detection of video/audio availability
+                                    $hasVideo = false;
+                                    $hasAudio = false;
+                                    $muxed = isset($f['muxed']) && $f['muxed'];
+                                    
+                                    // Check for new API keys
+                                    if (isset($f['hasVideo'])) $hasVideo = (bool)$f['hasVideo'];
+                                    if (isset($f['hasAudio'])) $hasAudio = (bool)$f['hasAudio'];
+                                    
+                                    // Fallback to traditional keys if new keys are missing
+                                    if (!$hasVideo && isset($f['vcodec']) && $f['vcodec'] !== 'none') $hasVideo = true;
+                                    if (!$hasAudio && isset($f['acodec']) && $f['acodec'] !== 'none') $hasAudio = true;
+                                    
+                                    // If both detected, it's muxed
+                                    if ($hasVideo && $hasAudio) $muxed = true;
+                                    
+                                    $itag = $f['itag'] ?? '';
+                                    $quality = $f['quality'] ?? ($f['height'] ?? 'N/A');
+                                    $formatType = $f['format'] ?? ($f['ext'] ?? 'mp4');
+                                    
+                                    // Determine display label
+                                    $label = '';
+                                    if ($muxed) {
+                                        $label = "{$quality}p";
+                                    } elseif ($hasVideo) {
+                                        $label = "{$quality}p (Video only)";
+                                    } elseif ($hasAudio) {
+                                        $label = "Audio";
+                                    } else {
+                                        continue; // Skip unknown formats
+                                    }
+                                    
+                                    // Build download link with format parameter
+                                    $downloadLink = "download.php?url=" . urlencode($videoUrl) . "&itag=" . urlencode($itag);
+                                ?>
+                                    <div class="download-item">
+                                        <div class="item-info">
+                                            <span class="badge bg-danger me-2"><?php echo strtoupper(htmlspecialchars($formatType)); ?></span>
+                                            <span class="fw-bold fs-6"><?php echo htmlspecialchars($label); ?></span>
+                                            <?php if ($muxed): ?>
+                                                <small class="text-success ms-2">✓ Video+Audio</small>
+                                            <?php elseif ($hasVideo): ?>
+                                                <small class="text-warning ms-2">Video only</small>
+                                            <?php elseif ($hasAudio): ?>
+                                                <small class="text-info ms-2">Audio</small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="action-btn">
+                                            <a href="<?php echo $downloadLink; ?>" 
+                                               class="btn btn-primary btn-sm px-4" 
+                                               onclick="showLoading()">
+                                                Yuklab olish
+                                            </a>
+                                        </div>
                                     </div>
-                                    <div class="action-btn">
-                                        <a href="<?php echo $downloadLink; ?>" 
-                                           class="btn btn-primary btn-sm px-4" 
-                                           onclick="showLoading()">
-                                            Yuklab olish
-                                        </a>
-                                    </div>
-                                </div>
-                            <?php 
-                            endforeach; 
+                                <?php 
+                                endforeach; 
+                            }
                             ?>
                         </div>
                         
-                        <?php if (empty($shownFormats)): ?>
+                        <?php if (empty($formats)): // Changed from $shownFormats to $formats ?>
                             <p class="text-warning">Yuklab olish formatlari topilmadi.</p>
                             <a href="download.php?url=<?php echo urlencode($videoUrl); ?>" 
                                class="btn btn-danger" 
