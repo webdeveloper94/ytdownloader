@@ -19,7 +19,6 @@ function loadEnv() {
             $value = trim($value);
             if (!array_key_exists($name, $_ENV)) {
                 $_ENV[$name] = $value;
-                putenv("$name=$value");
             }
         }
     }
@@ -55,8 +54,8 @@ function getVideoInfo($videoUrl) {
         return ['error' => 'Invalid YouTube URL'];
     }
     
-    $apiKey = getenv('RAPIDAPI_KEY');
-    $apiHost = getenv('RAPIDAPI_HOST');
+    $apiKey = $_ENV['RAPIDAPI_KEY'] ?? '';
+    $apiHost = $_ENV['RAPIDAPI_HOST'] ?? '';
     
     if (!$apiKey || !$apiHost) {
         return ['error' => 'RapidAPI credentials not configured'];
@@ -186,8 +185,8 @@ function getDownloadUrl($videoInfo, $itag = null) {
  * Initiate an asynchronous download job (POST /download)
  */
 function startDownloadAsync($videoUrl, $format = 'mp4', $quality = 720) {
-    $apiKey = getenv('RAPIDAPI_KEY');
-    $apiHost = getenv('RAPIDAPI_HOST');
+    $apiKey = $_ENV['RAPIDAPI_KEY'] ?? '';
+    $apiHost = $_ENV['RAPIDAPI_HOST'] ?? '';
     
     $ch = curl_init();
     $postData = json_encode([
@@ -225,8 +224,8 @@ function startDownloadAsync($videoUrl, $format = 'mp4', $quality = 720) {
  * Poll for job status (GET /status/{jobId})
  */
 function pollDownloadStatus($jobId) {
-    $apiKey = getenv('RAPIDAPI_KEY');
-    $apiHost = getenv('RAPIDAPI_HOST');
+    $apiKey = $_ENV['RAPIDAPI_KEY'] ?? '';
+    $apiHost = $_ENV['RAPIDAPI_HOST'] ?? '';
     
     $ch = curl_init();
     curl_setopt_array($ch, [
