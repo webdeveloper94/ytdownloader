@@ -106,57 +106,149 @@ function getVideoInfo($videoUrl) {
     }
     
     // Transform response to match expected format
-    if (isset($data['videoDetails'])) {
-        $videoDetails = $data['videoDetails'];
-        
-        return [
-            'title' => $videoDetails['title'] ?? 'Unknown',
-            'thumbnail' => $videoDetails['thumbnail'] ?? '',
-            'duration' => $videoDetails['duration'] ?? '',
-            'uploader' => $videoDetails['uploader'] ?? '',
-            'formats' => $videoDetails['formats'] ?? []
-        ];
-    }
+    // The API might return details at top level or wrapped in videoDetails
+    $details = isset($data['videoDetails']) ? $data['videoDetails'] : $data;
     
-    return $data;
+    return [
+        'title' => $details['title'] ?? ($details['videoDetails']['title'] ?? 'Unknown'),
+        'thumbnail' => $details['thumbnail'] ?? ($details['videoDetails']['thumbnail'] ?? ''),
+        'duration' => $details['duration'] ?? ($details['videoDetails']['duration'] ?? ''),
+        'uploader' => $details['uploader'] ?? ($details['channelTitle'] ?? ''),
+        'formats' => $details['formats'] ?? ($details['videoDetails']['formats'] ?? [])
+    ];
 }
 
 /**
  * Get download URL for specific format
  */
-function getDownloadUrl($videoInfo, $formatId = null) {
+function getDownloadUrl($videoInfo, $itag = null) {
     if (isset($videoInfo['error'])) {
         return null;
     }
     
-    // If format ID specified, find it
-    if ($formatId && isset($videoInfo['formats'])) {
-        foreach ($videoInfo['formats'] as $format) {
-            if (isset($format['format_id']) && $format['format_id'] == $formatId) {
-                return $format['url'] ?? null;
+    $formats = $videoInfo['formats'] ?? [];
+    if (empty($formats)) {
+        return null;
+    }
+    
+    // If itag specified, find exact format
+    if ($itag) {
+        foreach ($formats as $format) {
+            if (isset($format['itag']) && $format['itag'] == $itag) {
+                // Try different URL keys returned by RapidAPI
+                // Some APIs return true/false in directDownload, others return the URL.
+                $direct = $format['directDownload'] ?? '';
+                $url = $format['url'] ?? '';
+                
+                // Only use if it looks like a URL
+                if (is_string($direct) && strpos($direct, 'http') === 0) return $direct;
+                if (is_string($url) && strpos($url, 'http') === 0) return $url;
+                
+                return null;
             }
         }
     }
     
-    // Otherwise return best quality URL
-    if (isset($videoInfo['formats']) && !empty($videoInfo['formats'])) {
-        // Sort by quality (height)
-        $formats = $videoInfo['formats'];
-        usort($formats, function($a, $b) {
-            $heightA = $a['height'] ?? 0;
-            $heightB = $b['height'] ?? 0;
-            return $heightB - $heightA;
-        });
+    // Otherwise return best quality muxed (video+audio) URL as default
+    usort($formats, function($a, $b) {
+        $qualityA = (int)($a['quality'] ?? 0);
+        $qualityB = (int)($b['quality'] ?? 0);
+        return $qualityB - $qualityA;
+    });
+    
+    foreach ($formats as $format) {
+        $isMuxed = isset($format['muxed']) && $format['muxed'];
+        $direct = $format['directDownload'] ?? '';
+        $url = $format['url'] ?? '';
         
-        foreach ($formats as $format) {
-            if (isset($format['url'])) {
-                return $format['url'];
-            }
+        $link = null;
+        if (is_string($direct) && strpos($direct, 'http') === 0) $link = $direct;
+        elseif (is_string($url) && strpos($url, 'http') === 0) $link = $url;
+        
+        if ($isMuxed && $link) {
+            return $link;
         }
+    }
+    
+    // Fallback: Just return any first available URL
+    foreach ($formats as $format) {
+        $direct = $format['directDownload'] ?? '';
+        $url = $format['url'] ?? '';
+        
+        if (is_string($direct) && strpos($direct, 'http') === 0) return $direct;
+        if (is_string($url) && strpos($url, 'http') === 0) return $url;
     }
     
     return null;
 }
+
+/**
+ * Initiate an asynchronous download job (POST /download)
+ */
+function startDownloadAsync($videoUrl, $format = 'mp4', $quality = 720) {
+    $apiKey = getenv('RAPIDAPI_KEY');
+    $apiHost = getenv('RAPIDAPI_HOST');
+    
+    $ch = curl_init();
+    $postData = json_encode([
+        'url' => $videoUrl,
+        'format' => $format,
+        'quality' => (int)$quality
+    ]);
+    
+    curl_setopt_array($ch, [
+        CURLOPT_URL => "https://{$apiHost}/download",
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CUSTOMREQUEST => "POST",
+        CURLOPT_POSTFIELDS => $postData,
+        CURLOPT_HTTPHEADER => [
+            "Content-Type: application/json",
+            "x-rapidapi-host: {$apiHost}",
+            "x-rapidapi-key: {$apiKey}"
+        ],
+    ]);
+    
+    $response = curl_exec($ch);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] START ASYNC: $response | Err: $error\n", FILE_APPEND);
+    
+    if ($error) {
+        return ['error' => "Curl error: " . $error];
+    }
+    
+    return json_decode($response, true);
+}
+
+/**
+ * Poll for job status (GET /status/{jobId})
+ */
+function pollDownloadStatus($jobId) {
+    $apiKey = getenv('RAPIDAPI_KEY');
+    $apiHost = getenv('RAPIDAPI_HOST');
+    
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => "https://{$apiHost}/status/{$jobId}",
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            "x-rapidapi-host: {$apiHost}",
+            "x-rapidapi-key: {$apiKey}"
+        ],
+    ]);
+    
+    $response = curl_exec($ch);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    if ($error) {
+        return ['error' => "Curl error: " . $error];
+    }
+    
+    return json_decode($response, true);
+}
+
 
 /**
  * Format file size to human readable

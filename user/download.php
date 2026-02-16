@@ -55,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // GET request - video yuklab olish
 if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     $videoUrl = $_GET['url'] ?? '';
+    $itag = $_GET['itag'] ?? null;
     
     if (!$videoUrl) {
         die("Video URL kerak");
@@ -74,6 +75,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         ")->execute([$_SESSION['user_id']]);
     }
     
+    // Video URL ni tozalash (faqat v parametrini qoldirish)
+    if (preg_match('/[?&]v=([^&]+)/', $videoUrl, $matches)) {
+        $videoUrl = "https://www.youtube.com/watch?v=" . $matches[1];
+    }
+    
     // Video info olish
     $videoInfo = getVideoInfo($videoUrl);
     
@@ -81,47 +87,134 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         die("Video ma'lumotlari olinmadi: " . $videoInfo['error']);
     }
     
-    // Download URL olish
-    $downloadUrl = getDownloadUrl($videoInfo);
+    // --- YANGI: POST /download orqali authorized link olish ---
+    $finalDownloadUrl = '';
+    $selectedFormatDetails = null;
     
-    if (!$downloadUrl) {
+    if ($itag && isset($videoInfo['formats'])) {
+        foreach ($videoInfo['formats'] as $f) {
+            if ($f['itag'] == $itag) {
+                $selectedFormatDetails = $f;
+                break;
+            }
+        }
+    }
+    
+    if ($selectedFormatDetails) {
+        $quality = $selectedFormatDetails['quality'] ?? 720;
+        $format = $selectedFormatDetails['format'] ?? $selectedFormatDetails['ext'] ?? 'mp4';
+        
+        // Jobni boshlash
+        $startRes = startDownloadAsync($videoUrl, $format, $quality);
+        
+        if (isset($startRes['jobId'])) {
+            $jobId = $startRes['jobId'];
+            $maxAttempts = 30; // 30 marta tekshirish (jami ~60 soniya)
+            
+            for ($i = 0; $i < $maxAttempts; $i++) {
+                $statusRes = pollDownloadStatus($jobId);
+                
+                if (isset($statusRes['url']) && !empty($statusRes['url'])) {
+                    $finalDownloadUrl = $statusRes['url'];
+                    break;
+                }
+                
+                if (isset($statusRes['status']) && $statusRes['status'] === 'failed') {
+                    die("Xatolik: Video tayyorlashda xatolik yuz berdi.");
+                }
+                
+                sleep(2); // 2 soniya kutish
+            }
+        }
+    }
+    
+    // Agar async link olinmagan bo'lsa, eski usulda urinib ko'rish
+    if (!$finalDownloadUrl) {
+        $finalDownloadUrl = getDownloadUrl($videoInfo, $itag);
+    }
+    
+    if (!$finalDownloadUrl) {
         die("Video yuklab olish URL topilmadi");
     }
+    
+    // Fayl turi va nomini aniqlash
+    $contentType = 'video/mp4';
+    $extension = 'mp4';
+    $baseName = isset($videoInfo['title']) ? $videoInfo['title'] : 'video';
+    
+    if ($selectedFormatDetails) {
+        $f = $selectedFormatDetails;
+        // Determine if it's audio only
+        $vcodec = $f['vcodec'] ?? '';
+        $acodec = $f['acodec'] ?? '';
+        $hasVideo = isset($f['hasVideo']) ? (bool)$f['hasVideo'] : !empty($vcodec);
+        $hasAudio = isset($f['hasAudio']) ? (bool)$f['hasAudio'] : !empty($acodec);
+        $muxed = isset($f['muxed']) ? (bool)$f['muxed'] : ($hasVideo && $hasAudio);
+        
+        $isAudio = (!empty($acodec) && (empty($vcodec) || $vcodec === 'none')) || 
+                   ($hasAudio && !$hasVideo);
+        
+        if ($isAudio) {
+            $contentType = 'audio/mpeg';
+            $extension = ($f['format'] ?? $f['ext'] ?? 'mp3');
+            if ($extension === 'mp4' || $extension === 'm4v') $extension = 'm4a';
+        } else {
+            $contentType = 'video/mp4';
+            $extension = ($f['format'] ?? $f['ext'] ?? 'mp4');
+        }
+    }
+    
+    // Nomi tozalash (sanitize)
+    $safeBaseName = preg_replace('/[^a-zA-Z0-9_\-\s]/u', '', $baseName);
+    $safeBaseName = mb_substr($safeBaseName, 0, 100); // Limit length
+    $finalFileName = $safeBaseName . "." . $extension;
     
     // Video streaming
     set_time_limit(0);
     ignore_user_abort(true);
     
-    header('Content-Type: video/mp4');
-    header('Content-Disposition: attachment; filename="video.mp4"');
+    // Get headers from source to relay Content-Length
+    $ch_head = curl_init($finalDownloadUrl);
+    curl_setopt_array($ch_head, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HEADER => true,
+        CURLOPT_NOBODY => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    ]);
+    $head_res = curl_exec($ch_head);
+    $info = curl_getinfo($ch_head);
+    $size = $info['download_content_length'];
+    curl_close($ch_head);
+    
+    header("Content-Type: $contentType");
+    header("Content-Disposition: attachment; filename=\"$finalFileName\"");
+    if ($size > 0) header("Content-Length: $size");
     header('Cache-Control: no-cache');
+    header('Pragma: public');
     
-    $ch = curl_init($downloadUrl);
+    // Clear buffer to avoid any extra data
+    if (ob_get_level()) ob_end_clean();
     
+    $ch = curl_init($finalDownloadUrl);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => false,
         CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_BUFFERSIZE => 8192,
+        CURLOPT_BUFFERSIZE => 131072, // 128KB buffer
         CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         CURLOPT_TIMEOUT => 0,
         CURLOPT_WRITEFUNCTION => function ($ch, $data) {
             echo $data;
-            flush();
+            if (connection_aborted()) return 0;
             return strlen($data);
         }
     ]);
     
-    curl_exec($ch);
-    
-    if (curl_errno($ch)) {
-        $err = curl_error($ch);
-        $errno = curl_errno($ch);
-        
-        $debugLog = "[" . date('Y-m-d H:i:s') . "] STREAM ERROR\n";
-        $debugLog .= "CURL Error: " . $err . "\n";
-        $debugLog .= "CURL Errno: " . $errno . "\n\n";
-        
-        file_put_contents('../api_debug.log', $debugLog, FILE_APPEND);
+    if (!curl_exec($ch)) {
+        $error = curl_error($ch);
+        file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] DOWNLOAD STREAM ERROR: $error\n", FILE_APPEND);
     }
     
     curl_close($ch);

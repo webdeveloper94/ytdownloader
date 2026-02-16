@@ -211,3 +211,61 @@ SUCCESS: Video info received
 Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
 Formats: 5
 
+[2026-02-16 17:16:17] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+SUCCESS: Video info received
+Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
+Formats: 5
+
+[2026-02-16 17:16:32] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+SUCCESS: Video info received
+Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
+Formats: 5
+
+[2026-02-16 17:16:36] STREAM ERROR
+CURL Error: Failed to connect to 0.0.0.1 port 80 after 0 ms: Couldn't connect to server
+CURL Errno: 7
+
+[2026-02-16 17:16:53] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+SUCCESS: Video info received
+Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
+Formats: 5
+
+[2026-02-16 17:17:04] STREAM ERROR
+CURL Error: Failed to connect to 0.0.0.1 port 80 after 0 ms: Couldn't connect to server
+CURL Errno: 7
+
+[2026-02-16 17:30:21] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+SUCCESS: Video info received
+Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
+Formats: 5
+
+[2026-02-16 17:33:36] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+ERROR: API Error: HTTP 403 - {"message":"You are not subscribed to this API."}
+
+[2026-02-16 17:38:30] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+SUCCESS: Video info received
+Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
+Formats: 5
+
+[2026-02-16 17:48:36] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+SUCCESS: Video info received
+Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
+Formats: 5
+
+[2026-02-16 17:48:42] START ASYNC: {"jobId":"a3cc0d0f-e79b-4a9f-ace1-bf82dc198a4d","status":"queued","statusUrl":"https://youtubedownloadapi.com/yt-api/v1/status/a3cc0d0f-e79b-4a9f-ace1-bf82dc198a4d","estimatedTime":"10-20s","queuePosition":1,"type":"processed","directDownload":false} | Err: 
+[2026-02-16 17:52:11] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+SUCCESS: Video info received
+Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
+Formats: 5
+
+[2026-02-16 17:52:15] START ASYNC: {"downloadUrl":"https://rr3---sn-p5qlsndr.googlevideo.com/videoplayback?expire=1771279511&ei=N0CTafPlIsiHr9gP3PjL2Ac&ip=206.245.147.201&id=o-AKJfxcORG4Ni4lMZ_-jT9ERh5plpP6ekd4LxpR-b59yq&itag=18&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&met=1771257911%2C&mh=bZ&mm=31%2C29&mn=sn-p5qlsndr%2Csn-p5qddn7r&ms=au%2Crdu&mv=m&mvi=3&pl=21&rms=au%2Cau&initcwndbps=2216250&bui=AVNa5-xKnRXrdF_ZYGk0QMNUgS720R1bd7xipFDjG6r50tFRPUYamp84QCR5z6XfHnlwZaoplPCTAqw5&spc=6dlaFCYcQ_0jOXZQGB7RV0T8ZPq1B73Yt-MtetXmtAPOvUG7ijDY2X_K__vxYKBMW1U&vprv=1&svpuc=1&mime=video%2Fmp4&rqh=1&gir=yes&clen=6206679&ratebypass=yes&dur=136.881&lmt=1753883499097558&mt=1771257508&fvip=3&fexp=51552689%2C51565116%2C51565682%2C51580968%2C51772949&c=ANDROID&txp=5538534&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cratebypass%2Cdur%2Clmt&sig=AJEij0EwRAIgKFmDaoAK-tX8BNgbr98BCicjGsEgSXHmuPWBGZdb3qACIC4dEThgND6nSpWnuFoOub1a9wD3XBttMdOj5DvIm8dc&lsparams=met%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRgIhALF1WLLlEB6bH3wZZazUc1gXPgkT-lQVS5RemClsLSvRAiEA7dkG4M439kiAmK8tycUw1RaVwRtoUUz0LwKu3zC0bJU%3D","filename":"Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025_360p.mp4","fileSize":6206679,"processingTime":"instant","type":"stream","streamUrl":"https://rr3---sn-p5qlsndr.googlevideo.com/videoplayback?expire=1771279511&ei=N0CTafPlIsiHr9gP3PjL2Ac&ip=206.245.147.201&id=o-AKJfxcORG4Ni4lMZ_-jT9ERh5plpP6ekd4LxpR-b59yq&itag=18&source=youtube&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&met=1771257911%2C&mh=bZ&mm=31%2C29&mn=sn-p5qlsndr%2Csn-p5qddn7r&ms=au%2Crdu&mv=m&mvi=3&pl=21&rms=au%2Cau&initcwndbps=2216250&bui=AVNa5-xKnRXrdF_ZYGk0QMNUgS720R1bd7xipFDjG6r50tFRPUYamp84QCR5z6XfHnlwZaoplPCTAqw5&spc=6dlaFCYcQ_0jOXZQGB7RV0T8ZPq1B73Yt-MtetXmtAPOvUG7ijDY2X_K__vxYKBMW1U&vprv=1&svpuc=1&mime=video%2Fmp4&rqh=1&gir=yes&clen=6206679&ratebypass=yes&dur=136.881&lmt=1753883499097558&mt=1771257508&fvip=3&fexp=51552689%2C51565116%2C51565682%2C51580968%2C51772949&c=ANDROID&txp=5538534&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cxpc%2Cbui%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Crqh%2Cgir%2Cclen%2Cratebypass%2Cdur%2Clmt&sig=AJEij0EwRAIgKFmDaoAK-tX8BNgbr98BCicjGsEgSXHmuPWBGZdb3qACIC4dEThgND6nSpWnuFoOub1a9wD3XBttMdOj5DvIm8dc&lsparams=met%2Cmh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Crms%2Cinitcwndbps&lsig=APaTxxMwRgIhALF1WLLlEB6bH3wZZazUc1gXPgkT-lQVS5RemClsLSvRAiEA7dkG4M439kiAmK8tycUw1RaVwRtoUUz0LwKu3zC0bJU%3D","directDownload":true,"openInNewTab":true} | Err: 
+[2026-02-16 17:52:29] START ASYNC: {"error":"Requested format not available"} | Err: 
+[2026-02-16 17:52:38] START ASYNC: {"jobId":"fae6d20a-0663-4800-be08-75aa7d428f3e","status":"queued","statusUrl":"https://youtubedownloadapi.com/yt-api/v1/status/fae6d20a-0663-4800-be08-75aa7d428f3e","estimatedTime":"10-20s","queuePosition":1,"type":"processed","directDownload":false} | Err: 
