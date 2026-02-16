@@ -209,37 +209,35 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     $size = curl_getinfo($ch_head, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
     curl_close($ch_head);
     
-    // Manually clean any previous output
-    while (ob_get_level()) ob_end_clean();
-    
-    header("Content-Type: $contentType");
-    header("Content-Disposition: attachment; filename=\"$finalFileName\"");
-    if ($size > 0) header("Content-Length: $size");
-    
-    // Optimization for Nginx and proxies
-    header('X-Accel-Buffering: no');
-    header('Cache-Control: no-cache, no-store, must-revalidate');
-    header('Pragma: no-cache');
-    header('Expires: 0');
-    
-    $ch = curl_init($finalDownloadUrl);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => false, // Direct output
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        CURLOPT_TIMEOUT => 0,
-        // No need for WRITEFUNCTION if RETURNTRANSFER is false, it goes to stdout
-    ]);
-    
-    if (!curl_exec($ch)) {
-        $error = curl_error($ch);
-        // We can't log to file easily here if headers already sent, but we can try
-        @file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] DOWNLOAD STREAM ERROR: $error\n", FILE_APPEND);
+    // Clear output buffers
+    while (ob_get_level()) {
+        ob_end_clean();
     }
-    
+
+    ob_implicit_flush(true);
+
+    // Send headers
+    header("Content-Type: " . $contentType);
+    header("Content-Disposition: attachment; filename=\"" . $finalFileName . "\"");
+
+    // Open output stream
+    $fp = fopen('php://output', 'wb');
+
+    // Initialize cURL
+    $ch = curl_init($finalDownloadUrl);
+
+    curl_setopt($ch, CURLOPT_FILE, $fp);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
+    curl_setopt($ch, CURLOPT_HEADER, false);
+
+    // Execute and close
+    curl_exec($ch);
     curl_close($ch);
-    exit();
+    fclose($fp);
+
+    exit;
 }
 ?>
 <!DOCTYPE html>
