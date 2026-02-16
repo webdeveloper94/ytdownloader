@@ -8,22 +8,51 @@ function loadEnv() {
     static $loaded = false;
     if ($loaded) return;
     
-    $envPath = dirname(__DIR__);
-    if (file_exists($envPath . '/.env')) {
-        $lines = file($envPath . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    // Try different paths to find .env file (root of project)
+    $possiblePaths = [
+        dirname(__DIR__) . '/.env',                 // root/includes/.. -> root/
+        dirname(dirname(__FILE__)) . '/.env',       // root/includes/.. -> root/
+        $_SERVER['DOCUMENT_ROOT'] . '/.env',        // /var/www/html/
+        $_SERVER['DOCUMENT_ROOT'] . '/ytdownloader/.env',
+        './.env',
+        '../.env'
+    ];
+    
+    $envFile = null;
+    foreach ($possiblePaths as $path) {
+        if (file_exists($path)) {
+            $envFile = $path;
+            break;
+        }
+    }
+    
+    if ($envFile) {
+        $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
-            if (strpos(trim($line), '#') === 0) continue;
+            $line = trim($line);
+            if (empty($line) || strpos($line, '#') === 0) continue;
             if (strpos($line, '=') === false) continue;
+            
             list($name, $value) = explode('=', $line, 2);
             $name = trim($name);
             $value = trim($value);
-            if (!array_key_exists($name, $_ENV)) {
-                $_ENV[$name] = $value;
+            
+            // Clean value (quotes)
+            $value = trim($value, "\"' \t\n\r\0\x0B");
+            
+            // Populate $_ENV and $_SERVER as fallback
+            $_ENV[$name] = $value;
+            $_SERVER[$name] = $value;
+            
+            // Still try putenv if available, though it might fail on server
+            if (function_exists('putenv')) {
+                @putenv("$name=$value");
             }
         }
     }
     $loaded = true;
 }
+
 
 /**
  * Extract video ID from YouTube URL
