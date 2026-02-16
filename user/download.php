@@ -184,24 +184,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     set_time_limit(0);
     ignore_user_abort(true);
     
-    // Get headers from source to relay Content-Length
-    $ch_head = curl_init($finalDownloadUrl);
-    curl_setopt_array($ch_head, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HEADER => true,
-        CURLOPT_NOBODY => true,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 20,
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    ]);
-    $head_res = curl_exec($ch_head);
-    $httpCode = curl_getinfo($ch_head, CURLINFO_HTTP_CODE);
-    $size = curl_getinfo($ch_head, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
-    curl_close($ch_head);
-
-    file_put_contents('../api_debug.log', "HEAD RES: HTTP $httpCode, SIZE $size\n", FILE_APPEND);
-    
     // Clear output buffers
     while (ob_get_level()) {
         ob_end_clean();
@@ -212,6 +194,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     // Send headers
     header("Content-Type: " . $contentType);
     header("Content-Disposition: attachment; filename=\"" . $finalFileName . "\"");
+    header("X-Accel-Buffering: no");
+    header("Cache-Control: no-cache, no-store, must-revalidate");
+    header("Pragma: no-cache");
+    header("Expires: 0");
 
     // Open output stream
     $fp = fopen('php://output', 'wb');
@@ -219,19 +205,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     // Initialize cURL
     $ch = curl_init($finalDownloadUrl);
 
-    curl_setopt($ch, CURLOPT_FILE, $fp);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
-    curl_setopt($ch, CURLOPT_HEADER, false);
+    $ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
+    
+    curl_setopt_array($ch, [
+        CURLOPT_FILE => $fp,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_USERAGENT => $ua,
+        CURLOPT_REFERER => 'https://www.youtube.com/',
+        CURLOPT_HEADER => false,
+        CURLOPT_BUFFERSIZE => 262144, // 256KB
+        CURLOPT_TIMEOUT => 0,
+        CURLOPT_CONNECTTIMEOUT => 30,
+        CURLOPT_FAILONERROR => true // Return false on 401, 403, etc.
+    ]);
 
-    // Execute and close
-    if (!curl_exec($ch)) {
-        $err = curl_error($ch);
-        @file_put_contents('../api_debug.log', "STREAM EXEC ERROR: $err\n", FILE_APPEND);
-    }
+    // Execute
+    $success = curl_exec($ch);
+    $error = curl_error($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    
     curl_close($ch);
     fclose($fp);
+
+    // Agar stream muvaffaqiyatsiz bo'lsa (masalan 403), brauzerni to'g'ridan-to'g'ri linkka yo'naltiramiz
+    if (!$success && ($httpCode == 403 || empty($httpCode))) {
+        @file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] STREAM FAILED (HTTP $httpCode), REDIRECTING USER TO LINK. Error: $error\n", FILE_APPEND);
+        
+        // Sarlavhalarni tozalash (agar iloji bo'lsa) va redirect qilish
+        // Lekin headers allaqachon yuborilgan bo'lishi mumkin (Content-Type)
+        // Shuning uchun JS orqali redirect qilamiz
+        echo "<script>window.location.href = '$finalDownloadUrl';</script>";
+    }
 
     exit;
 }

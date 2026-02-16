@@ -224,16 +224,25 @@ function startDownloadAsync($videoUrl, $format = 'mp4', $quality = 720) {
         'quality' => (int)$quality
     ]);
     
+    // Forward our server IP to help with IP-binding on some APIs
+    $serverIp = $_SERVER['SERVER_ADDR'] ?? '95.111.250.26';
+    
+    $headers = [
+        "Content-Type: application/json",
+        "x-rapidapi-host: $apiHost",
+        "x-rapidapi-key: $apiKey",
+        "X-Forwarded-For: $serverIp",
+        "X-Real-IP: $serverIp"
+    ];
+    
     curl_setopt_array($ch, [
         CURLOPT_URL => "https://{$apiHost}/download",
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CUSTOMREQUEST => "POST",
+        CURLOPT_POST => true,
         CURLOPT_POSTFIELDS => $postData,
-        CURLOPT_HTTPHEADER => [
-            "Content-Type: application/json",
-            "x-rapidapi-host: {$apiHost}",
-            "x-rapidapi-key: {$apiKey}"
-        ],
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 30
     ]);
     
     $response = curl_exec($ch);
