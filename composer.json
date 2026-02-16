@@ -1,0 +1,14 @@
+{
+    "name": "webdeveloper94/ytdownloader",
+    "description": "YouTube Video Downloader with RapidAPI",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "vlucas/phpdotenv": "^5.5"
+    },
+    "autoload": {
+        "files": [
+            "includes/rapidapi.php"
+        ]
+    }
+}

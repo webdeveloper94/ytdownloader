@@ -1,60 +1,73 @@
 <?php
-// VPS serverda root directory: /var/www/html/ yoki /var/www/html/ytdownloader/
-// Bu fayl: yt_api.php
+// VPS_yt_api.php - Production version (identical to yt_api.php)
 
-set_time_limit(600); // 10 daqiqa PHP timeout (video yuklab olish uchun)
+require_once 'includes/rapidapi.php';
+
+set_time_limit(300); // 5 minutes for video download
 
 $url = $_GET['url'] ?? '';
 $info = isset($_GET['info']) && $_GET['info'] == '1';
 
 if (!$url) {
-    die(json_encode(['error' => 'URL kerak']));
-}
-
-if ($info) {
-    // Video ma'lumotlarini JSON formatida qaytarish
     header('Content-Type: application/json');
-    
-    $cmd = "yt-dlp -J --extractor-args youtube:player_client=web " . escapeshellarg($url) . " 2>&1";
-    $output = shell_exec($cmd);
-    
-    if ($output) {
-        $json = json_decode($output, true);
-        if ($json && !isset($json['error'])) {
-            echo json_encode($json);
-        } else {
-            echo json_encode(['error' => 'Video ma\'lumotlari olinmadi', 'raw' => $output]);
-        }
-    } else {
-        echo json_encode(['error' => 'yt-dlp ishlamadi']);
-    }
+    echo json_encode(['error' => 'URL parameter required']);
     exit;
 }
 
-// Video yuklab olish (eng yaxshi sifat)
-$tmp = sys_get_temp_dir() . '/yt_' . uniqid() . '.mp4';
+if ($info) {
+    // Return video information in JSON format
+    header('Content-Type: application/json');
+    $videoInfo = getVideoInfo($url);
+    echo json_encode($videoInfo);
+    exit;
+}
 
-$cmd = "yt-dlp -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\" " .
-       "--merge-output-format mp4 " .
-       "--extractor-args youtube:player_client=web " .
-       "-o " . escapeshellarg($tmp) . " " .
-       escapeshellarg($url) . " 2>&1";
+// Get video info first
+$videoInfo = getVideoInfo($url);
 
-exec($cmd, $cmdOutput, $returnCode);
+if (isset($videoInfo['error'])) {
+    header('Content-Type: application/json');
+    echo json_encode($videoInfo);
+    exit;
+}
 
-if (file_exists($tmp) && filesize($tmp) > 0) {
-    header('Content-Type: video/mp4');
-    header('Content-Disposition: attachment; filename="video.mp4"');
-    header('Content-Length: ' . filesize($tmp));
-    
-    readfile($tmp);
-    unlink($tmp);
-} else {
+// Get download URL
+$downloadUrl = getDownloadUrl($videoInfo);
+
+if (!$downloadUrl) {
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'No download URL found']);
+    exit;
+}
+
+// Stream the video from the download URL
+header('Content-Type: video/mp4');
+header('Content-Disposition: attachment; filename="video.mp4"');
+header('Cache-Control: no-cache');
+
+$ch = curl_init($downloadUrl);
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => false,
+    CURLOPT_FOLLOWLOCATION => true,
+    CURLOPT_BUFFERSIZE => 8192,
+    CURLOPT_SSL_VERIFYPEER => false,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_WRITEFUNCTION => function ($ch, $data) {
+        echo $data;
+        flush();
+        return strlen($data);
+    }
+]);
+
+curl_exec($ch);
+
+if (curl_errno($ch)) {
     header('Content-Type: application/json');
     echo json_encode([
-        'error' => 'Video yuklab olinmadi',
-        'details' => implode("\n", $cmdOutput),
-        'return_code' => $returnCode
+        'error' => 'Download failed',
+        'details' => curl_error($ch)
     ]);
 }
+
+curl_close($ch);
 ?>

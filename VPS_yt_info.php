@@ -1,33 +1,27 @@
 <?php
-// VPS serverda root directory: /var/www/html/ yoki /var/www/html/ytdownloader/
-// Bu fayl: yt_info.php
+// VPS_yt_info.php - Production version (identical to yt_info.php)
+
+require_once 'includes/rapidapi.php';
 
 header('Content-Type: application/json');
-set_time_limit(300); // 5 daqiqa PHP timeout
+set_time_limit(60);
 
 $url = $_GET['url'] ?? '';
 
 if (!$url) {
-    echo json_encode(['error' => 'URL kerak']);
+    echo json_encode(['error' => 'URL parameter required']);
     exit;
 }
 
-// yt-dlp dan JSON formatida video ma'lumotlarini olish
-// VPS da Node.js runtime va ffmpeg o'rnatilgan bo'lishi kerak
-$cmd = "yt-dlp -J --extractor-args youtube:player_client=web " . escapeshellarg($url) . " 2>&1";
-$output = shell_exec($cmd);
-
-if ($output) {
-    // JSON ni decode qilish
-    $json = json_decode($output, true);
-    if ($json && !isset($json['error'])) {
-        // Muvaffaqiyatli JSON qaytarish
-        echo json_encode($json);
-    } else {
-        // Xato yoki yaroqsiz JSON
-        echo json_encode(['error' => 'Video ma\'lumotlari olinmadi', 'raw' => $output]);
-    }
-} else {
-    echo json_encode(['error' => 'yt-dlp ishlamadi']);
+// Validate YouTube URL
+if (strpos($url, 'youtube.com') === false && strpos($url, 'youtu.be') === false) {
+    echo json_encode(['error' => 'Invalid YouTube URL']);
+    exit;
 }
+
+// Get video info from RapidAPI
+$videoInfo = getVideoInfo($url);
+
+// Return the response
+echo json_encode($videoInfo);
 ?>

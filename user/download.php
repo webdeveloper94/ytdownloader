@@ -1,6 +1,7 @@
 <?php
 require_once '../config/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/rapidapi.php';
 requireLogin();
 
 // User limit check
@@ -28,169 +29,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } elseif (strpos($videoUrl, 'youtube.com') === false && strpos($videoUrl, 'youtu.be') === false) {
         $error = "Faqat YouTube videolarni yuklab olish mumkin!";
     } else {
-        // API dan video ma'lumotlarini olish
-        // LOCAL MODE: Lokal serverda test qilish uchun localhost ishlatamiz
-        // PRODUCTION MODE: VPS serverni ishlatish uchun quyidagi qatorlarni o'zgartiring
-        $useLocal = true; // true = localhost (Windows XAMPP), false = VPS server
-        
-        if ($useLocal) {
-            // Lokal server (XAMPP) - yt-dlp Windows da o'rnatilgan
-            $baseUrl = "http://localhost/ytdownloader/";
-            $infoApi1 = $baseUrl . "yt_info.php?url=" . urlencode($videoUrl);
-            $infoApi2 = $baseUrl . "yt_api.php?info=1&url=" . urlencode($videoUrl);
-        } else {
-            // VPS server (95.111.250.26) - PRODUCTION
-            // IMPORTANT: VPS da yt_info.php va yt_api.php root directory da bo'lishi kerak
-            // Agar subdirectory da bo'lsa, URL ni o'zgartiring, masalan:
-            // $baseUrl = "http://95.111.250.26/ytdownloader/";
-            $infoApi1 = "http://95.111.250.26/yt_info.php?url=" . urlencode($videoUrl);
-            $infoApi2 = "http://95.111.250.26/yt_api.php?info=1&url=" . urlencode($videoUrl);
-        }
-
+        // RapidAPI dan video ma'lumotlarini olish
+        set_time_limit(60);
         
         // Debug log
-        $debugLog = "[" . date('Y-m-d H:i:s') . "] INFO REQUEST\n";
-        $debugLog .= "Trying: " . $infoApi1 . "\n";
+        $debugLog = "[" . date('Y-m-d H:i:s') . "] RAPIDAPI REQUEST\n";
+        $debugLog .= "Video URL: " . $videoUrl . "\n";
         
-        $response = null;
-        $httpCode = 0;
-        $curlError = '';
-        $curlErrno = 0;
-        $apiUsed = '';
+        $videoInfo = getVideoInfo($videoUrl);
         
-        // Birinchi variant: yt_info.php
-        // Katta videolar uchun timeout oshirildi
-        set_time_limit(300); // PHP execution timeout: 5 daqiqa
-        
-        $ch = curl_init($infoApi1);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => 30,
-            CURLOPT_TIMEOUT => 180, // 3 daqiqa (katta videolar uchun)
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_FOLLOWLOCATION => true,
-        ]);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        $curlErrno = curl_errno($ch);
-        curl_close($ch);
-        
-        $apiUsed = $infoApi1;
-        
-        // Debug log yozish
-        $debugLog .= "API 1 (yt_info.php) - HTTP Code: " . $httpCode . "\n";
-        $debugLog .= "CURL Error: " . ($curlError ?: 'None') . "\n";
-        $debugLog .= "CURL Errno: " . ($curlErrno ?: '0') . "\n";
-        
-        // Agar 404 bo'lsa, ikkinchi variantni sinab ko'ramiz
-        if ($httpCode == 404) {
-            $debugLog .= "\nTrying alternative: " . $infoApi2 . "\n";
-            
-            $ch = curl_init($infoApi2);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_CONNECTTIMEOUT => 30,
-                CURLOPT_TIMEOUT => 180, // 3 daqiqa
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_FOLLOWLOCATION => true,
-            ]);
-            
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            $curlErrno = curl_errno($ch);
-            curl_close($ch);
-            
-            $apiUsed = $infoApi2;
-            $debugLog .= "API 2 (yt_api.php?info=1) - HTTP Code: " . $httpCode . "\n";
-        }
-        
-        $debugLog .= "Response Length: " . strlen($response) . " bytes\n";
-        
-        if ($response) {
-            $debugLog .= "Response Preview: " . substr($response, 0, 500) . "\n";
-        }
-        
-        if ($httpCode == 200 && $response) {
-            $videoInfo = json_decode($response, true);
-            $jsonError = json_last_error();
-            
-            $debugLog .= "JSON Decode Error: " . ($jsonError ? json_last_error_msg() : 'None') . "\n";
-            
-            if ($jsonError === JSON_ERROR_NONE && $videoInfo) {
-                if (isset($videoInfo['error'])) {
-                    // VPS-dan xato qaytdi
-                    $vpsError = $videoInfo['error'] ?? "Video ma'lumotlari olinmadi";
-                    $rawError = $videoInfo['raw'] ?? '';
-                    
-                    // Raw outputdan JSON ni ajratib olishga harakat qilish
-                    if ($rawError) {
-                        $lines = explode("\n", $rawError);
-                        $extractedJson = null;
-                        
-                        foreach ($lines as $line) {
-                            $trimmed = trim($line);
-                            if ($trimmed && ($trimmed[0] === '{' || $trimmed[0] === '[')) {
-                                $extractedJson = json_decode($trimmed, true);
-                                if ($extractedJson && json_last_error() === JSON_ERROR_NONE) {
-                                    // JSON muvaffaqiyatli topildi!
-                                    $videoInfo = $extractedJson;
-                                    $error = ''; // Xatoni olib tashlash
-                                    $debugLog .= "SUCCESS: JSON extracted from raw output\n";
-                                    $debugLog .= "Video Title: " . ($videoInfo['title'] ?? 'N/A') . "\n";
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Agar JSON topilmagan bo'lsa, xatolikni ko'rsatish
-                    if ($error !== '') {
-                        // yt-dlp versiya xatosini aniqlash
-                        if (strpos($rawError, 'Precondition check failed') !== false || 
-                            strpos($rawError, 'HTTP Error 400') !== false) {
-                            $error = "VPS serverda yt-dlp versiyasi eskigan. ";
-                            $error .= "YouTube-ning yangi talablariga mos emas. ";
-                            $error .= "VPS serverda 'sudo pip3 install --upgrade yt-dlp' buyrug'ini bajaring.";
-                        } elseif (strpos($rawError, 'No supported JavaScript runtime') !== false) {
-                            $error = "VPS serverda JavaScript runtime (Node.js) o'rnatilmagan yoki to'g'ri sozlanmagan. ";
-                            $error .= "VPS serverda 'sudo apt install -y nodejs' buyrug'ini bajaring.";
-                        } else {
-                            $error = "VPS API xatosi: " . $vpsError;
-                        }
-                        
-                        $debugLog .= "API Error: " . $vpsError . "\n";
-                        if ($rawError) {
-                            $debugLog .= "Raw Error: " . substr($rawError, 0, 500) . "\n";
-                        }
-                    }
-                } else {
-                    $debugLog .= "SUCCESS: Video info received from " . $apiUsed . "\n";
-                    $debugLog .= "Video Title: " . ($videoInfo['title'] ?? 'N/A') . "\n";
-                    $debugLog .= "Formats Count: " . (isset($videoInfo['formats']) ? count($videoInfo['formats']) : 0) . "\n";
-                }
-            } else {
-                $error = "Video ma'lumotlari JSON formatida emas";
-                $debugLog .= "ERROR: Invalid JSON response\n";
-            }
+        if (isset($videoInfo['error'])) {
+            $error = "Video ma'lumotlari olinmadi: " . $videoInfo['error'];
+            $debugLog .= "ERROR: " . $videoInfo['error'] . "\n";
         } else {
-            if ($curlErrno == 28) {
-                $error = "VPS API so'rovni bajarishda vaqt tugadi (Timeout). Iltimos, qaytadan urinib ko'ring yoki URL manzilini tekshiring.";
-            } elseif ($httpCode == 0 || $curlErrno) {
-                $error = "VPS API ga ulanib bo'lmadi (CURL error: $curlError). Server ishlamayapti yoki internet aloqasi yo'q.";
-            } elseif ($httpCode == 404) {
-                $error = "VPS API endpoint topilmadi. Iltimos, VPS serverda quyidagi fayllardan birini yarating:\n";
-                $error .= "1. yt_info.php (http://95.111.250.26/yt_info.php)\n";
-                $error .= "2. Yoki yt_api.php ga ?info=1 parametri qo'shish";
-            } elseif ($httpCode >= 500) {
-                $error = "VPS serverda xatolik yuz berdi (HTTP $httpCode)";
-            } else {
-                $error = "Video ma'lumotlarini olishda xatolik yuz berdi (HTTP $httpCode)";
-            }
-            $debugLog .= "ERROR: " . $error . " (CURL Errno: $curlErrno)\n";
-            $debugLog .= "Used API: " . $apiUsed . "\n";
+            $debugLog .= "SUCCESS: Video info received\n";
+            $debugLog .= "Title: " . ($videoInfo['title'] ?? 'N/A') . "\n";
+            $debugLog .= "Formats: " . (isset($videoInfo['formats']) ? count($videoInfo['formats']) : 0) . "\n";
         }
         
         // Debug log faylga yozish
@@ -220,15 +74,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         ")->execute([$_SESSION['user_id']]);
     }
     
-    // Video streaming API
-    $useLocal = true; // Yuqoridagi qiymat bilan bir xil
+    // Video info olish
+    $videoInfo = getVideoInfo($videoUrl);
     
-    if ($useLocal) {
-        $api = "http://localhost/ytdownloader/yt_api.php?url=" . urlencode($videoUrl);
-    } else {
-        $api = "http://95.111.250.26/yt_api.php?url=" . urlencode($videoUrl);
+    if (isset($videoInfo['error'])) {
+        die("Video ma'lumotlari olinmadi: " . $videoInfo['error']);
     }
     
+    // Download URL olish
+    $downloadUrl = getDownloadUrl($videoInfo);
+    
+    if (!$downloadUrl) {
+        die("Video yuklab olish URL topilmadi");
+    }
+    
+    // Video streaming
     set_time_limit(0);
     ignore_user_abort(true);
     
@@ -236,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     header('Content-Disposition: attachment; filename="video.mp4"');
     header('Cache-Control: no-cache');
     
-    $ch = curl_init($api);
+    $ch = curl_init($downloadUrl);
     
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => false,
@@ -256,21 +116,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     if (curl_errno($ch)) {
         $err = curl_error($ch);
         $errno = curl_errno($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         
-        $debugLog = "[" . date('Y-m-d H:i:s') . "] VPS STREAM ERROR\n";
-        $debugLog .= "URL: " . $api . "\n";
-        $debugLog .= "HTTP Code: " . $httpCode . "\n";
+        $debugLog = "[" . date('Y-m-d H:i:s') . "] STREAM ERROR\n";
         $debugLog .= "CURL Error: " . $err . "\n";
         $debugLog .= "CURL Errno: " . $errno . "\n\n";
         
-        file_put_contents('../api_debug.log', $debugLog, FILE_APPEND);
-    } else {
-        // Muvaffaqiyatli streaming
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $debugLog = "[" . date('Y-m-d H:i:s') . "] VPS STREAM SUCCESS\n";
-        $debugLog .= "URL: " . $api . "\n";
-        $debugLog .= "HTTP Code: " . $httpCode . "\n\n";
         file_put_contents('../api_debug.log', $debugLog, FILE_APPEND);
     }
     
@@ -452,31 +302,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                             </a>
                         <?php endif; ?>
                     </div>
-                </div>
-            </div>
-        <?php elseif ($videoUrl): ?>
-            <div class="card download-card text-center">
-                <h2 class="mb-4">Video tayyor</h2>
-                <p class="mb-4 text-white-50">Quyidagi tugmani bosib videoni yuklab oling</p>
-                
-                <div class="mb-4">
-                    <p class="text-white-50 small">
-                        <strong>Video URL:</strong><br>
-                        <span class="text-white"><?php echo htmlspecialchars($videoUrl); ?></span>
-                    </p>
-                </div>
-                
-                <a href="download.php?url=<?php echo urlencode($videoUrl); ?>" 
-                   class="btn btn-danger download-btn" 
-                   onclick="showLoading()">
-                    <i class="fa-solid fa-download me-2"></i>Video yuklab olish
-                </a>
-                
-                <div class="mt-4">
-                    <p class="text-white-50 small">
-                        <i class="fa-solid fa-info-circle me-2"></i>
-                        Video serverda tayyorlanmoqda. Bu bir necha daqiqa vaqt olishi mumkin.
-                    </p>
                 </div>
             </div>
         <?php else: ?>

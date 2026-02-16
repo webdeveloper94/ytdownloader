@@ -1,31 +1,27 @@
 <?php
-// yt_info.php - Video ma'lumotlarini olish (lokal test uchun)
+// yt_info.php - Get video information using RapidAPI (NO yt-dlp)
+
+require_once 'includes/rapidapi.php';
 
 header('Content-Type: application/json');
-set_time_limit(300); // 5 daqiqa PHP timeout
+set_time_limit(60);
 
 $url = $_GET['url'] ?? '';
 
 if (!$url) {
-    echo json_encode(['error' => 'URL kerak']);
+    echo json_encode(['error' => 'URL parameter required']);
     exit;
 }
 
-// yt-dlp dan JSON formatida video ma'lumotlarini olish
-// Node.js runtime ishlatish (YouTube uchun kerak)
-$cmd = "yt-dlp -J --extractor-args youtube:player_client=web " . escapeshellarg($url) . " 2>&1";
-$output = shell_exec($cmd);
-
-if ($output) {
-    // JSON ni tozalash va qaytarish
-    $json = json_decode($output, true);
-    if ($json && !isset($json['error'])) {
-        echo json_encode($json);
-    } else {
-        echo json_encode(['error' => 'Video ma\'lumotlari olinmadi', 'raw' => $output]);
-    }
-} else {
-    echo json_encode(['error' => 'yt-dlp ishlamadi']);
+// Validate YouTube URL
+if (strpos($url, 'youtube.com') === false && strpos($url, 'youtu.be') === false) {
+    echo json_encode(['error' => 'Invalid YouTube URL']);
+    exit;
 }
-?>
 
+// Get video info from RapidAPI
+$videoInfo = getVideoInfo($url);
+
+// Return the response
+echo json_encode($videoInfo);
+?>

@@ -149,3 +149,35 @@ Response Length: 0 bytes
 ERROR: VPS API so'rovni bajarishda vaqt tugadi (Timeout). Iltimos, qaytadan urinib ko'ring yoki URL manzilini tekshiring. (CURL Errno: 28)
 Used API: http://localhost/ytdownloader/yt_info.php?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DXww1EeTdt7I%26list%3DRDMMXww1EeTdt7I%26start_radio%3D1
 
+[2026-02-09 18:28:33] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=Xww1EeTdt7I&list=RDXww1EeTdt7I&start_radio=1
+ERROR: API Error: HTTP 403
+
+[2026-02-09 18:30:52] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=Xww1EeTdt7I&list=RDXww1EeTdt7I&start_radio=1
+ERROR: API Error: HTTP 403
+
+[2026-02-09 18:33:38] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=Xww1EeTdt7I&list=RDXww1EeTdt7I&start_radio=1
+ERROR: API Error: HTTP 403
+
+[2026-02-16 16:41:08] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/shorts/5ZAtIYgHrsI
+ERROR: API Error: HTTP 403
+
+[2026-02-16 16:49:40] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/shorts/5ZAtIYgHrsI
+ERROR: API Error: HTTP 403
+
+[2026-02-16 16:57:57] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/shorts/5ZAtIYgHrsI
+SUCCESS: Video info received
+Title: The boys fled on their motorcycles.70#funny
+Formats: 2
+
+[2026-02-16 16:58:34] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=Xww1EeTdt7I&list=RDXww1EeTdt7I&start_radio=1
+SUCCESS: Video info received
+Title: شيماء الراسي - الطـيبة غلط مو صح - ميلـي وبخصرك ميلي 2025
+Formats: 5
+

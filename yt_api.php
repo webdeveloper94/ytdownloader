@@ -1,53 +1,73 @@
 <?php
-// yt_api.php - Video ma'lumoti va yuklab olish (lokal test uchun)
+// yt_api.php - Video download handler using RapidAPI (NO yt-dlp)
 
-set_time_limit(600); // 10 daqiqa PHP timeout (video yuklab olish uchun)
+require_once 'includes/rapidapi.php';
+
+set_time_limit(300); // 5 minutes for video download
 
 $url = $_GET['url'] ?? '';
 $info = isset($_GET['info']) && $_GET['info'] == '1';
 
-if (!$url) die("URL kerak");
-
-if ($info) {
-    // Video ma'lumotlarini JSON formatida qaytarish
+if (!$url) {
     header('Content-Type: application/json');
-    
-    $cmd = "yt-dlp -J --extractor-args youtube:player_client=web " . escapeshellarg($url) . " 2>&1";
-    $output = shell_exec($cmd);
-    
-    if ($output) {
-        $json = json_decode($output, true);
-        if ($json && !isset($json['error'])) {
-            echo json_encode($json);
-        } else {
-            echo json_encode(['error' => 'Video ma\'lumotlari olinmadi', 'raw' => $output]);
-        }
-    } else {
-        echo json_encode(['error' => 'yt-dlp ishlamadi']);
-    }
+    echo json_encode(['error' => 'URL parameter required']);
     exit;
 }
 
-// Video yuklab olish (eng yaxshi sifat)
-$tmp = sys_get_temp_dir() . '/yt_' . uniqid() . '.mp4';
-
-$cmd = "yt-dlp -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\" " .
-       "--merge-output-format mp4 " .
-       "--extractor-args youtube:player_client=web " .
-       "-o " . escapeshellarg($tmp) . " " .
-       escapeshellarg($url) . " 2>&1";
-
-exec($cmd, $cmdOutput, $returnCode);
-
-if (file_exists($tmp) && filesize($tmp) > 0) {
-    header('Content-Type: video/mp4');
-    header('Content-Disposition: attachment; filename="video.mp4"');
-    header('Content-Length: ' . filesize($tmp));
-    
-    readfile($tmp);
-    unlink($tmp);
-} else {
-    header('Content-Type: text/plain');
-    echo "Video yuklab olinmadi. Xato: " . implode("\n", $cmdOutput);
+if ($info) {
+    // Return video information in JSON format
+    header('Content-Type: application/json');
+    $videoInfo = getVideoInfo($url);
+    echo json_encode($videoInfo);
+    exit;
 }
+
+// Get video info first
+$videoInfo = getVideoInfo($url);
+
+if (isset($videoInfo['error'])) {
+    header('Content-Type: application/json');
+    echo json_encode($videoInfo);
+    exit;
+}
+
+// Get download URL
+$downloadUrl = getDownloadUrl($videoInfo);
+
+if (!$downloadUrl) {
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'No download URL found']);
+    exit;
+}
+
+// Stream the video from the download URL
+header('Content-Type: video/mp4');
+header('Content-Disposition: attachment; filename="video.mp4"');
+header('Cache-Control: no-cache');
+
+$ch = curl_init($downloadUrl);
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => false,
+    CURLOPT_FOLLOWLOCATION => true,
+    CURLOPT_BUFFERSIZE => 8192,
+    CURLOPT_SSL_VERIFYPEER => false,
+    CURLOPT_TIMEOUT => 0,
+    CURLOPT_WRITEFUNCTION => function ($ch, $data) {
+        echo $data;
+        flush();
+        return strlen($data);
+    }
+]);
+
+curl_exec($ch);
+
+if (curl_errno($ch)) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'error' => 'Download failed',
+        'details' => curl_error($ch)
+    ]);
+}
+
+curl_close($ch);
 ?>
