@@ -218,11 +218,22 @@ function startDownloadAsync($videoUrl, $format = 'mp4', $quality = 720) {
     $apiHost = $_ENV['RAPIDAPI_HOST'] ?? '';
     
     $ch = curl_init();
-    $postData = json_encode([
+    
+    // Get user IP for IP-binding
+    $userIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+    // If it's a comma separated list, take the first one
+    if (strpos($userIp, ',') !== false) {
+        $userIp = trim(explode(',', $userIp)[0]);
+    }
+    
+    $postDataArr = [
         'url' => $videoUrl,
         'format' => $format,
-        'quality' => (int)$quality
-    ]);
+        'quality' => (int)$quality,
+        'proxy' => true,      // Try to trigger API's internal proxy
+        'client_ip' => $userIp // Forward user IP
+    ];
+    $postData = json_encode($postDataArr);
     
     // Forward our server IP to help with IP-binding on some APIs
     $serverIp = $_SERVER['SERVER_ADDR'] ?? '95.111.250.26';
@@ -231,8 +242,9 @@ function startDownloadAsync($videoUrl, $format = 'mp4', $quality = 720) {
         "Content-Type: application/json",
         "x-rapidapi-host: $apiHost",
         "x-rapidapi-key: $apiKey",
-        "X-Forwarded-For: $serverIp",
-        "X-Real-IP: $serverIp"
+        "X-Forwarded-For: $userIp",
+        "X-Real-IP: $serverIp",
+        "X-Client-IP: $userIp"
     ];
     
     curl_setopt_array($ch, [

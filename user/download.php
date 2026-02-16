@@ -193,6 +193,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     set_time_limit(0);
     ignore_user_abort(true);
     
+    // Probe URL before sending any headers
+    $ch_probe = curl_init($finalDownloadUrl);
+    $ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
+    
+    curl_setopt_array($ch_probe, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HEADER => true,
+        CURLOPT_NOBODY => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_USERAGENT => $ua,
+        CURLOPT_REFERER => 'https://www.youtube.com/',
+        CURLOPT_TIMEOUT => 20
+    ]);
+    
+    $probe_res = curl_exec($ch_probe);
+    $httpCode = curl_getinfo($ch_probe, CURLINFO_HTTP_CODE);
+    curl_close($ch_probe);
+
+    if ($httpCode == 403 || empty($httpCode)) {
+        @file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] PROBE FAILED (HTTP $httpCode), REDIRECTING USER THROUGH JS. Link: $finalDownloadUrl\n", FILE_APPEND);
+        echo "<script>window.location.href = '$finalDownloadUrl';</script>";
+        exit;
+    }
+
     // Clear output buffers
     while (ob_get_level()) {
         ob_end_clean();
@@ -200,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
 
     ob_implicit_flush(true);
 
-    // Send headers
+    // Send headers only after successful probe
     header("Content-Type: " . $contentType);
     header("Content-Disposition: attachment; filename=\"" . $finalFileName . "\"");
     header("X-Accel-Buffering: no");
@@ -208,13 +233,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     header("Pragma: no-cache");
     header("Expires: 0");
 
-    // Open output stream
+    // Open output stream and stream to client
     $fp = fopen('php://output', 'wb');
 
     // Initialize cURL
     $ch = curl_init($finalDownloadUrl);
 
-    $ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
     
     curl_setopt_array($ch, [
         CURLOPT_FILE => $fp,
@@ -225,28 +249,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         CURLOPT_HEADER => false,
         CURLOPT_BUFFERSIZE => 262144, // 256KB
         CURLOPT_TIMEOUT => 0,
-        CURLOPT_CONNECTTIMEOUT => 30,
-        CURLOPT_FAILONERROR => true // Return false on 401, 403, etc.
+        CURLOPT_CONNECTTIMEOUT => 30
     ]);
 
     // Execute
     $success = curl_exec($ch);
     $error = curl_error($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     
     curl_close($ch);
     fclose($fp);
-
-    // Agar stream muvaffaqiyatsiz bo'lsa (masalan 403), brauzerni to'g'ridan-to'g'ri linkka yo'naltiramiz
-    if (!$success && ($httpCode == 403 || empty($httpCode))) {
-        @file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] STREAM FAILED (HTTP $httpCode), REDIRECTING USER TO LINK. Error: $error\n", FILE_APPEND);
-        
-        // Sarlavhalarni tozalash (agar iloji bo'lsa) va redirect qilish
-        // Lekin headers allaqachon yuborilgan bo'lishi mumkin (Content-Type)
-        // Shuning uchun JS orqali redirect qilamiz
-        echo "<script>window.location.href = '$finalDownloadUrl';</script>";
-    }
-
     exit;
 }
 ?>
