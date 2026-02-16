@@ -158,6 +158,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         die("Video yuklab olish URL topilmadi");
     }
     
+    // DEBUG: Log URL and headers
+    $logMsg = "[" . date('Y-m-d H:i:s') . "] ATTEMPTING DOWNLOAD\n";
+    $logMsg .= "URL: $finalDownloadUrl\n";
+    file_put_contents('../api_debug.log', $logMsg, FILE_APPEND);
+    
     // Fayl turi va nomini aniqlash
     $contentType = 'video/mp4';
     $extension = 'mp4';
@@ -206,8 +211,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     ]);
     $head_res = curl_exec($ch_head);
+    $httpCode = curl_getinfo($ch_head, CURLINFO_HTTP_CODE);
     $size = curl_getinfo($ch_head, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
     curl_close($ch_head);
+
+    file_put_contents('../api_debug.log', "HEAD RES: HTTP $httpCode, SIZE $size\n", FILE_APPEND);
     
     // Clear output buffers
     while (ob_get_level()) {
@@ -233,7 +241,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     curl_setopt($ch, CURLOPT_HEADER, false);
 
     // Execute and close
-    curl_exec($ch);
+    if (!curl_exec($ch)) {
+        $err = curl_error($ch);
+        @file_put_contents('../api_debug.log', "STREAM EXEC ERROR: $err\n", FILE_APPEND);
+    }
     curl_close($ch);
     fclose($fp);
 
