@@ -291,3 +291,20 @@ SUCCESS: Video info received
 Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
 Formats: 5
 
+[2026-02-16 18:20:32] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+SUCCESS: Video info received
+Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
+Formats: 5
+
+[2026-02-16 18:23:42] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+ERROR: API Error: HTTP 429 - {"message":"You have exceeded the MONTHLY quota for Requests on your current plan, BASIC. Upgrade your plan at https:\/\/rapidapi.com\/KvnqPoza\/api\/yt-video-audio-downloader-api"}
+
+[2026-02-16 18:40:52] RAPIDAPI REQUEST
+Video URL: https://www.youtube.com/watch?v=hEHhLtE_NxY&list=RDXww1EeTdt7I&index=4
+SUCCESS: Video info received
+Title: Peshraw Hawrami - Chakrdi (Zdiib Remix) 🔥 أروع اغنيه كرديه - شاكردى ريمكس 2025
+Formats: 5
+
+[2026-02-16 18:40:57] START ASYNC: {"error":"Requested format not available"} | Err: 

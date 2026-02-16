@@ -435,7 +435,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                                     if ($isAudio) {
                                         $label = "Audio";
                                     } else {
-                                        $label = "360p " . ($f['qualityLabel'] ?? '');
+                                        $label = "Video";
+                                    }
+                                    
+                                    // Get file size
+                                    $sizeStr = '';
+                                    if (isset($f['filesize']) && !empty($f['filesize'])) {
+                                        $sizeStr = formatFileSize($f['filesize']);
+                                    } elseif (isset($f['contentLength']) && !empty($f['contentLength'])) {
+                                        $sizeStr = formatFileSize($f['contentLength']);
                                     }
                                     
                                     // Build download link with format parameter
@@ -445,12 +453,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                                         <div class="item-info">
                                             <span class="badge bg-danger me-2"><?php echo strtoupper(htmlspecialchars($formatType)); ?></span>
                                             <span class="fw-bold fs-6"><?php echo htmlspecialchars($label); ?></span>
-                                            <?php if ($muxed): ?>
-                                                <small class="text-success ms-2">✓ Video+Audio</small>
-                                            <?php elseif ($hasVideo): ?>
-                                                <small class="text-warning ms-2">Video only</small>
-                                            <?php elseif ($hasAudio): ?>
-                                                <small class="text-info ms-2">Audio</small>
+                                            <?php if ($sizeStr): ?>
+                                                <span class="badge bg-secondary ms-2"><?php echo htmlspecialchars($sizeStr); ?></span>
+                                            <?php endif; ?>
+                                            <?php if ($muxed && !$isAudio): ?>
+                                                <small class="text-success ms-2">✓ HD</small>
                                             <?php endif; ?>
                                         </div>
                                         <div class="action-btn">
