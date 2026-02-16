@@ -1,4 +1,5 @@
 <?php
+// v3.1 - Robust Streaming & Fixed
 require_once '../config/db.php';
 require_once '../includes/auth.php';
 require_once '../includes/rapidapi.php';
@@ -55,15 +56,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // GET request - video yuklab olish
 if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     $videoUrl = $_GET['url'] ?? '';
-    $itag = $_GET['itag'] ?? null;
+    $itag = (isset($_GET['itag'])) ? (int)$_GET['itag'] : 0;
     
-    if (!$videoUrl) {
-        die("Video URL kerak");
+    if (!$videoUrl || !$itag) {
+        die("Video URL yoki itag kerak");
     }
-    
-    // Limit tekshirish va kamaytirish
+    // Limit tekshirish
     if (!$isSubscribed && !$hasDownloads) {
-        die("Yuklab olish limiti tugagan.");
+        die("Hisobingizda yuklashlar soni tugagan.");
     }
     
     // Limit kamaytirish
@@ -75,23 +75,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         ")->execute([$_SESSION['user_id']]);
     }
     
-    // Video URL ni tozalash (faqat v parametrini qoldirish)
-    if (preg_match('/[?&]v=([^&]+)/', $videoUrl, $matches)) {
-        $videoUrl = "https://www.youtube.com/watch?v=" . $matches[1];
-    }
-    
     // Video info olish
     $videoInfo = getVideoInfo($videoUrl);
     
-    if (isset($videoInfo['error'])) {
-        die("Video ma'lumotlari olinmadi: " . $videoInfo['error']);
+    if (!$videoInfo || isset($videoInfo['error'])) {
+        die("Video ma'lumotlarini olishda xatolik yuz berdi.");
     }
     
-    // --- YANGI: POST /download orqali authorized link olish ---
-    $finalDownloadUrl = '';
+    // Find selected format details
     $selectedFormatDetails = null;
-    
-    if ($itag && isset($videoInfo['formats'])) {
+    if (isset($videoInfo['formats'])) {
         foreach ($videoInfo['formats'] as $f) {
             if ($f['itag'] == $itag) {
                 $selectedFormatDetails = $f;
@@ -101,18 +94,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     }
     
     // --- MUHIM: Barcha formatlar uchun Async /download ishlatamiz ---
-    // Direct linklar serverda 403 xato berayotgani aniqlandi
-    
     $finalDownloadUrl = '';
     
     if ($selectedFormatDetails) {
-        $quality = $selectedFormatDetails['quality'] ?? 720;
-        $format = $selectedFormatDetails['format'] ?? $selectedFormatDetails['ext'] ?? 'mp4';
+        $vcodec = $selectedFormatDetails['vcodec'] ?? '';
+        $acodec = $selectedFormatDetails['acodec'] ?? '';
+        $hasVideo = isset($selectedFormatDetails['hasVideo']) ? (bool)$selectedFormatDetails['hasVideo'] : !empty($vcodec);
+        $hasAudio = isset($selectedFormatDetails['hasAudio']) ? (bool)$selectedFormatDetails['hasAudio'] : !empty($acodec);
+        $isAudio = (!empty($acodec) && (empty($vcodec) || $vcodec === 'none')) || ($hasAudio && !$hasVideo);
+
+        $quality = 720;
+        $format = 'mp4';
+
+        if ($isAudio) {
+            $format = 'mp3'; // Audio itaglar uchun mp3 so'raymiz
+            $quality = 128; 
+        } else {
+            $quality = $selectedFormatDetails['quality'] ?? 720;
+            $format = $selectedFormatDetails['format'] ?? $selectedFormatDetails['ext'] ?? 'mp4';
+        }
         
         // Jobni boshlash
         $startRes = startDownloadAsync($videoUrl, $format, $quality);
+        $startLog = json_encode($startRes);
+        file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] START ASYNC: $startLog | itag: $itag\n", FILE_APPEND);
         
-        if (isset($startRes['jobId'])) {
+        if (isset($startRes['url']) && !empty($startRes['url'])) {
+            $finalDownloadUrl = $startRes['url'];
+        } elseif (isset($startRes['jobId'])) {
             $jobId = $startRes['jobId'];
             $maxAttempts = 45; // 45 marta (jami ~90 soniya) yetarli
             
@@ -134,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         }
     }
     
-    // Agar async link olinmagan bo'lsa, oxirgi chora sifatida direct link-ni tekshiramiz
+    // Agar async link olinmagan bo'lsa, fallback sifatida direct link
     if (!$finalDownloadUrl) {
         $finalDownloadUrl = getDownloadUrl($videoInfo, $itag);
     }
