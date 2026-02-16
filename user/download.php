@@ -100,27 +100,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         }
     }
     
-    // --- MUHIM: Audio uchun Async ishlatish shart (Direct link 403 xato beradi) ---
-    // --- 360p (itag 18) uchun esa Direct link ishlayveradi ---
+    // --- MUHIM: Barcha formatlar uchun Async /download ishlatamiz ---
+    // Direct linklar serverda 403 xato berayotgani aniqlandi
     
-    $isAudio = false;
-    if ($selectedFormatDetails) {
-        $vcodec = $selectedFormatDetails['vcodec'] ?? '';
-        $acodec = $selectedFormatDetails['acodec'] ?? '';
-        $hasVideo = isset($selectedFormatDetails['hasVideo']) ? (bool)$selectedFormatDetails['hasVideo'] : !empty($vcodec);
-        $hasAudio = isset($selectedFormatDetails['hasAudio']) ? (bool)$selectedFormatDetails['hasAudio'] : !empty($acodec);
-        $isAudio = (!empty($acodec) && (empty($vcodec) || $vcodec === 'none')) || ($hasAudio && !$hasVideo);
-    }
-
     $finalDownloadUrl = '';
     
-    // Agar itag 18 (360p) bo'lsa direct link-ni tekshiramiz
-    if ($itag == 18) {
-        $finalDownloadUrl = getDownloadUrl($videoInfo, $itag);
-    }
-
-    // Agar audio bo'lsa yoki direct link topilmagan bo'lsa, Async /download orqali yuklaymiz
-    if ($isAudio || (!$finalDownloadUrl && $selectedFormatDetails)) {
+    if ($selectedFormatDetails) {
         $quality = $selectedFormatDetails['quality'] ?? 720;
         $format = $selectedFormatDetails['format'] ?? $selectedFormatDetails['ext'] ?? 'mp4';
         
@@ -129,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         
         if (isset($startRes['jobId'])) {
             $jobId = $startRes['jobId'];
-            $maxAttempts = 30; // Audio va 360p uchun 30 ta (1 min) yetarli
+            $maxAttempts = 45; // 45 marta (jami ~90 soniya) yetarli
             
             for ($i = 0; $i < $maxAttempts; $i++) {
                 $statusRes = pollDownloadStatus($jobId);
@@ -149,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         }
     }
     
-    // Fallback if everything failed
+    // Agar async link olinmagan bo'lsa, oxirgi chora sifatida direct link-ni tekshiramiz
     if (!$finalDownloadUrl) {
         $finalDownloadUrl = getDownloadUrl($videoInfo, $itag);
     }

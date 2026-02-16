@@ -8,8 +8,22 @@ vendor/
 uploads/*
 !uploads/.gitkeep
 
-# Logs
+# Logs and Debug
 *.log
+*.txt
+api_debug.log
+api_debug_full.txt
+log_tail.txt
+debug_async_results.txt
+video_*_info.txt
+
+# Temp Debug Files
+inspect_muxed.php
+test_audio_direct.php
+debug_async_qualities.php
+debug_env.php
+test_*.php
+debug_*.php
 
 # OS
 .DS_Store
