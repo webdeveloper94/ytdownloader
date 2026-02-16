@@ -100,7 +100,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         }
     }
     
+    // --- MUHIM: Audio uchun Async ishlatish shart (Direct link 403 xato beradi) ---
+    // --- 360p (itag 18) uchun esa Direct link ishlayveradi ---
+    
+    $isAudio = false;
     if ($selectedFormatDetails) {
+        $vcodec = $selectedFormatDetails['vcodec'] ?? '';
+        $acodec = $selectedFormatDetails['acodec'] ?? '';
+        $hasVideo = isset($selectedFormatDetails['hasVideo']) ? (bool)$selectedFormatDetails['hasVideo'] : !empty($vcodec);
+        $hasAudio = isset($selectedFormatDetails['hasAudio']) ? (bool)$selectedFormatDetails['hasAudio'] : !empty($acodec);
+        $isAudio = (!empty($acodec) && (empty($vcodec) || $vcodec === 'none')) || ($hasAudio && !$hasVideo);
+    }
+
+    $finalDownloadUrl = '';
+    
+    // Agar itag 18 (360p) bo'lsa direct link-ni tekshiramiz
+    if ($itag == 18) {
+        $finalDownloadUrl = getDownloadUrl($videoInfo, $itag);
+    }
+
+    // Agar audio bo'lsa yoki direct link topilmagan bo'lsa, Async /download orqali yuklaymiz
+    if ($isAudio || (!$finalDownloadUrl && $selectedFormatDetails)) {
         $quality = $selectedFormatDetails['quality'] ?? 720;
         $format = $selectedFormatDetails['format'] ?? $selectedFormatDetails['ext'] ?? 'mp4';
         
@@ -109,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
         
         if (isset($startRes['jobId'])) {
             $jobId = $startRes['jobId'];
-            $maxAttempts = 30; // 30 marta tekshirish (jami ~60 soniya)
+            $maxAttempts = 30; // Audio va 360p uchun 30 ta (1 min) yetarli
             
             for ($i = 0; $i < $maxAttempts; $i++) {
                 $statusRes = pollDownloadStatus($jobId);
@@ -120,15 +140,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                 }
                 
                 if (isset($statusRes['status']) && $statusRes['status'] === 'failed') {
-                    die("Xatolik: Video tayyorlashda xatolik yuz berdi.");
+                    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] JOB FAILED: " . json_encode($statusRes) . "\n", FILE_APPEND);
+                    break;
                 }
                 
-                sleep(2); // 2 soniya kutish
+                sleep(2);
             }
         }
     }
     
-    // Agar async link olinmagan bo'lsa, eski usulda urinib ko'rish
+    // Fallback if everything failed
     if (!$finalDownloadUrl) {
         $finalDownloadUrl = getDownloadUrl($videoInfo, $itag);
     }
@@ -333,8 +354,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                             if (empty($formats)) {
                                 echo '<p class="text-warning">Formatlar topilmadi.</p>';
                             } else {
-                                // Sort by quality (higher first)
-                                usort($formats, function($a, $b) {
+                                // Filter formats: Only 360p (itag 18) and Audio
+                                $filteredFormats = [];
+                                foreach ($formats as $f) {
+                                    $itag = $f['itag'] ?? '';
+                                    $vcodec = $f['vcodec'] ?? '';
+                                    $acodec = $f['acodec'] ?? '';
+                                    $hasVideo = isset($f['hasVideo']) ? (bool)$f['hasVideo'] : !empty($vcodec);
+                                    $hasAudio = isset($f['hasAudio']) ? (bool)$f['hasAudio'] : !empty($acodec);
+                                    
+                                    $is360p = ($itag == 18 || (isset($f['quality']) && $f['quality'] == '360p'));
+                                    $isAudio = (!empty($acodec) && (empty($vcodec) || $vcodec === 'none')) || ($hasAudio && !$hasVideo);
+                                    
+                                    if ($is360p || $isAudio) {
+                                        $filteredFormats[] = $f;
+                                    }
+                                }
+                                
+                                if (empty($filteredFormats)) {
+                                    echo '<p class="text-warning">Mo\'ljallangan formatlar (360p/Audio) topilmadi.</p>';
+                                }
+
+                                // Sort by quality (higher first) for filtered formats
+                                usort($filteredFormats, function($a, $b) {
                                     $qualityA = $a['quality'] ?? 0;
                                     $qualityB = $b['quality'] ?? 0;
                                     
@@ -343,10 +385,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                                         return $qualityB - $qualityA;
                                     }
                                     
+                                    // Prioritize audio if one is audio and the other is not
+                                    $vcodecA = $a['vcodec'] ?? '';
+                                    $acodecA = $a['acodec'] ?? '';
+                                    $hasVideoA = isset($a['hasVideo']) ? (bool)$a['hasVideo'] : !empty($vcodecA);
+                                    $hasAudioA = isset($a['hasAudio']) ? (bool)$a['hasAudio'] : !empty($acodecA);
+                                    $isAudioA = (!empty($acodecA) && (empty($vcodecA) || $vcodecA === 'none')) || ($hasAudioA && !$hasVideoA);
+
+                                    $vcodecB = $b['vcodec'] ?? '';
+                                    $acodecB = $b['acodec'] ?? '';
+                                    $hasVideoB = isset($b['hasVideo']) ? (bool)$b['hasVideo'] : !empty($vcodecB);
+                                    $hasAudioB = isset($b['hasAudio']) ? (bool)$b['hasAudio'] : !empty($acodecB);
+                                    $isAudioB = (!empty($acodecB) && (empty($vcodecB) || $vcodecB === 'none')) || ($hasAudioB && !$hasVideoB);
+
+                                    if ($isAudioA && !$isAudioB) return 1; // Audio A comes after video B
+                                    if (!$isAudioA && $isAudioB) return -1; // Video A comes before audio B
+                                    
                                     return 0;
                                 });
-                                
-                                foreach ($formats as $f): 
+
+                                foreach ($filteredFormats as $f): 
                                     // Robust detection of video/audio availability
                                     $hasVideo = false;
                                     $hasAudio = false;
@@ -367,16 +425,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                                     $quality = $f['quality'] ?? ($f['height'] ?? 'N/A');
                                     $formatType = $f['format'] ?? ($f['ext'] ?? 'mp4');
                                     
+                                    // Determine if it's audio only
+                                    $vcodec = $f['vcodec'] ?? '';
+                                    $acodec = $f['acodec'] ?? '';
+                                    $isAudio = (!empty($acodec) && (empty($vcodec) || $vcodec === 'none')) || ($hasAudio && !$hasVideo);
+
                                     // Determine display label
                                     $label = '';
-                                    if ($muxed) {
-                                        $label = "{$quality}p";
-                                    } elseif ($hasVideo) {
-                                        $label = "{$quality}p (Video only)";
-                                    } elseif ($hasAudio) {
+                                    if ($isAudio) {
                                         $label = "Audio";
                                     } else {
-                                        continue; // Skip unknown formats
+                                        $label = "360p " . ($f['qualityLabel'] ?? '');
                                     }
                                     
                                     // Build download link with format parameter
@@ -408,7 +467,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                             ?>
                         </div>
                         
-                        <?php if (empty($formats)): // Changed from $shownFormats to $formats ?>
+                        <?php if (empty($filteredFormats)): // Changed from $shownFormats to $formats ?>
                             <p class="text-warning">Yuklab olish formatlari topilmadi.</p>
                             <a href="download.php?url=<?php echo urlencode($videoUrl); ?>" 
                                class="btn btn-danger" 
