@@ -57,9 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     $videoUrl = $_GET['url'] ?? '';
     $itag = (isset($_GET['itag'])) ? (int)$_GET['itag'] : 0;
+    $type = $_GET['type'] ?? ''; // audio yoki video
+    $jobId = $_GET['jobId'] ?? ''; // Mavjud jobId bo'lsa
     
-    if (!$videoUrl || !$itag) {
-        die("Video URL yoki itag kerak");
+    if (!$videoUrl || (!$itag && !$jobId)) {
+        die("Video URL, itag yoki jobId kerak");
     }
     // Limit tekshirish
     if (!$isSubscribed && !$hasDownloads) {
@@ -114,37 +116,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             $format = $selectedFormatDetails['format'] ?? $selectedFormatDetails['ext'] ?? 'mp4';
         }
         
-        // Jobni boshlash
-        $startRes = startDownloadAsync($videoUrl, $format, $quality);
-        $startLog = json_encode($startRes);
-        file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] START ASYNC: $startLog | itag: $itag\n", FILE_APPEND);
-        
-        if (isset($startRes['url']) && !empty($startRes['url'])) {
-            $finalDownloadUrl = $startRes['url'];
-        } elseif (isset($startRes['jobId'])) {
-            $jobId = $startRes['jobId'];
-            // MP3 konvertatsiya vaqti ko'proq bo'lishi mumkin
-            $maxAttempts = $isAudio ? 120 : 60; // Audio: 240s, Video: 120s
+        // Jobni boshlash (agar jobId yo'q bo'lsa)
+        if (!$jobId) {
+            $startRes = startDownloadAsync($videoUrl, $format, $quality);
+            $startLog = json_encode($startRes);
+            file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] START ASYNC: $startLog | itag: $itag\n", FILE_APPEND);
             
+            if (isset($startRes['url']) && !empty($startRes['url'])) {
+                $finalDownloadUrl = $startRes['url'];
+            } elseif (isset($startRes['jobId'])) {
+                $jobId = $startRes['jobId'];
+            }
+        }
+
+        // Dinamik URL hosil qilish (User talabi bo'yicha)
+        if ($jobId && ($type === 'audio' || $type === 'video')) {
+            $apiHost = $_ENV['RAPIDAPI_HOST'] ?? 'yt-video-audio-downloader-api.p.rapidapi.com';
+            $fileSuffix = ($type === 'audio') ? 'audio.mp3' : 'video.mp4';
+            $finalDownloadUrl = "https://{$apiHost}/file/{$jobId}/{$fileSuffix}";
+            
+            // Polling (Fayl tayyor bo'lishini kutish)
+            $maxAttempts = ($type === 'audio') ? 120 : 60;
             for ($i = 0; $i < $maxAttempts; $i++) {
                 $statusRes = pollDownloadStatus($jobId);
-                
-                // Har 5 marta statusni log qilish
                 if ($i % 5 == 0) {
-                    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] POLLING ($i/$maxAttempts) [$jobId]: " . ($statusRes['status'] ?? 'unknown') . "\n", FILE_APPEND);
+                    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] POLLING Dynamic ($i/$maxAttempts) [$jobId]: " . ($statusRes['status'] ?? 'unknown') . "\n", FILE_APPEND);
                 }
-
+                if (isset($statusRes['status']) && ($statusRes['status'] === 'completed' || $statusRes['status'] === 'success' || isset($statusRes['url']))) {
+                    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] Ready for dynamic download after $i attempts.\n", FILE_APPEND);
+                    break;
+                }
+                if (isset($statusRes['status']) && $statusRes['status'] === 'failed') break;
+                sleep(2);
+            }
+        } elseif ($jobId && !$finalDownloadUrl) {
+            // Standart polling (agar URL hali olinmagan bo'lsa)
+            $maxAttempts = $isAudio ? 120 : 60;
+            for ($i = 0; $i < $maxAttempts; $i++) {
+                $statusRes = pollDownloadStatus($jobId);
+                if ($i % 5 == 0) {
+                    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] POLLING Standard ($i/$maxAttempts) [$jobId]: " . ($statusRes['status'] ?? 'unknown') . "\n", FILE_APPEND);
+                }
                 if (isset($statusRes['url']) && !empty($statusRes['url'])) {
                     $finalDownloadUrl = $statusRes['url'];
-                    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] POLLING SUCCESS after $i attempts.\n", FILE_APPEND);
                     break;
                 }
-                
-                if (isset($statusRes['status']) && $statusRes['status'] === 'failed') {
-                    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] JOB FAILED: " . json_encode($statusRes) . "\n", FILE_APPEND);
-                    break;
-                }
-                
+                if (isset($statusRes['status']) && $statusRes['status'] === 'failed') break;
                 sleep(2);
             }
         }
@@ -192,9 +209,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     }
     
     // Nomi tozalash (sanitize)
-    $safeBaseName = preg_replace('/[^a-zA-Z0-9_\-\s]/u', '', $baseName);
-    $safeBaseName = mb_substr($safeBaseName, 0, 100); // Limit length
-    $finalFileName = $safeBaseName . "." . $extension;
+    if ($type === 'audio') {
+        $finalFileName = "audio.mp3";
+    } elseif ($type === 'video') {
+        $finalFileName = "video.mp4";
+    } else {
+        $safeBaseName = preg_replace('/[^a-zA-Z0-9_\-\s]/u', '', $baseName);
+        $safeBaseName = mb_substr($safeBaseName, 0, 100); // Limit length
+        $finalFileName = $safeBaseName . "." . $extension;
+    }
     
     // Video streaming
     set_time_limit(0);
@@ -260,6 +283,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
     ]);
 
     // Execute
+    set_time_limit(0);
+    ini_set('max_execution_time', 0);
+    ignore_user_abort(true);
+    
     $success = curl_exec($ch);
     $error = curl_error($ch);
     
@@ -472,8 +499,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
                                         $sizeStr = formatFileSize($f['contentLength']);
                                     }
                                     
-                                    // Build download link with format parameter
-                                    $downloadLink = "download.php?url=" . urlencode($videoUrl) . "&itag=" . urlencode($itag);
+                                    // Build download link with format and type parameters
+                                    $typeParam = $isAudio ? 'audio' : 'video';
+                                    $downloadLink = "download.php?url=" . urlencode($videoUrl) . "&itag=" . urlencode($itag) . "&type=" . $typeParam;
                                 ?>
                                     <div class="download-item">
                                         <div class="item-info">

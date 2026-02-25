@@ -110,6 +110,10 @@ function getVideoInfo($videoUrl) {
         ],
     ]);
     
+    set_time_limit(0);
+    ini_set('max_execution_time', 0);
+    ignore_user_abort(true);
+    
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $error = curl_error($ch);
@@ -254,8 +258,13 @@ function startDownloadAsync($videoUrl, $format = 'mp4', $quality = 720) {
         CURLOPT_POSTFIELDS => $postData,
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_TIMEOUT => 30
+        CURLOPT_TIMEOUT => 0,
+        CURLOPT_CONNECTTIMEOUT => 30
     ]);
+    
+    set_time_limit(0);
+    ini_set('max_execution_time', 0);
+    ignore_user_abort(true);
     
     $response = curl_exec($ch);
     $error = curl_error($ch);
@@ -286,6 +295,10 @@ function pollDownloadStatus($jobId) {
             "x-rapidapi-key: {$apiKey}"
         ],
     ]);
+    
+    set_time_limit(0);
+    ini_set('max_execution_time', 0);
+    ignore_user_abort(true);
     
     $response = curl_exec($ch);
     $error = curl_error($ch);
