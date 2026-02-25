@@ -101,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['screenshot'])) {
                     <label>Obuna turi</label>
                     <select name="type" id="type" onchange="updateAmount()" style="width: 100%; padding: 12px; border-radius: 8px; background: #2a2a2a; color: white; border: 1px solid var(--glass);">
                         <option value="monthly" data-price="<?php echo $settings['monthly_price']; ?>">Oylik obuna</option>
-                        <option value="per_video" data-price="<?php echo $settings['per_video_price']; ?>">Video-ba-video</option>
+                        <option value="per_video" data-price="<?php echo $settings['per_video_price']; ?>">Har bir video uchun</option>
                     </select>
                 </div>
                 <div class="form-group">

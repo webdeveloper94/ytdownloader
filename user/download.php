@@ -123,13 +123,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['url'])) {
             $finalDownloadUrl = $startRes['url'];
         } elseif (isset($startRes['jobId'])) {
             $jobId = $startRes['jobId'];
-            $maxAttempts = 45; // 45 marta (jami ~90 soniya) yetarli
+            // MP3 konvertatsiya vaqti ko'proq bo'lishi mumkin
+            $maxAttempts = $isAudio ? 120 : 60; // Audio: 240s, Video: 120s
             
             for ($i = 0; $i < $maxAttempts; $i++) {
                 $statusRes = pollDownloadStatus($jobId);
                 
+                // Har 5 marta statusni log qilish
+                if ($i % 5 == 0) {
+                    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] POLLING ($i/$maxAttempts) [$jobId]: " . ($statusRes['status'] ?? 'unknown') . "\n", FILE_APPEND);
+                }
+
                 if (isset($statusRes['url']) && !empty($statusRes['url'])) {
                     $finalDownloadUrl = $statusRes['url'];
+                    file_put_contents('../api_debug.log', "[" . date('Y-m-d H:i:s') . "] POLLING SUCCESS after $i attempts.\n", FILE_APPEND);
                     break;
                 }
                 
